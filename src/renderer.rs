@@ -1,68 +1,19 @@
-use bytemuck::{Pod, Zeroable};
 use wgpu::{util::DeviceExt, Buffer};
 use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window};
 
-#[derive(Copy, Clone, Debug, Pod, Zeroable)]
-#[repr(C)]
-struct Vertex {
-    position: [f32; 3],
-    color: [f32; 3],
-}
-
-impl Vertex {
-    fn layout() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    shader_location: 0,
-                    format: wgpu::VertexFormat::Float32x3,
-                },
-                wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
-                    shader_location: 1,
-                    format: wgpu::VertexFormat::Float32x3,
-                },
-            ],
-        }
-    }
-}
-
-const VERTICES: &[Vertex] = &[
-    Vertex {
-        position: [-0.0868241, 0.49240386, 0.0],
-        color: [0.5, 0.0, 0.5],
-    }, // A
-    Vertex {
-        position: [-0.49513406, 0.06958647, 0.0],
-        color: [0.5, 0.0, 0.5],
-    }, // B
-    Vertex {
-        position: [-0.21918549, -0.44939706, 0.0],
-        color: [0.5, 0.0, 0.5],
-    }, // C
-    Vertex {
-        position: [0.35966998, -0.3473291, 0.0],
-        color: [0.5, 0.0, 0.5],
-    }, // D
-    Vertex {
-        position: [0.44147372, 0.2347359, 0.0],
-        color: [0.5, 0.0, 0.5],
-    }, // E
-];
-
-const INDICES: &[u16] = &[0, 1, 4, 1, 2, 4, 2, 3, 4];
+use crate::{Atlas, Vertex, INDICES, VERTICES};
 
 pub struct Renderer {
     surface: wgpu::Surface,
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
+    render_pipeline: wgpu::RenderPipeline,
+
     size: PhysicalSize<u32>,
     window: Window,
-    render_pipeline: wgpu::RenderPipeline,
+
+    atlas: Atlas,
 
     vertex_buffer: Buffer,
     index_buffer: Buffer,
@@ -187,7 +138,10 @@ impl Renderer {
 
         let num_indices = INDICES.len();
 
+        let atlas = Atlas::from_device(&device);
+
         Self {
+            atlas,
             vertex_buffer,
             index_buffer,
             num_indices,
@@ -215,6 +169,14 @@ impl Renderer {
             }
             _ => false,
         }
+    }
+
+    pub fn device(&self) -> &wgpu::Device {
+        &self.device
+    }
+
+    pub fn queue(&self) -> &wgpu::Queue {
+        &self.queue
     }
 
     pub fn window(&self) -> &Window {
