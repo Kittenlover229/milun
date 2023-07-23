@@ -1,4 +1,4 @@
-use milun::Renderer;
+use wffl::Renderer;
 use winit::{
     event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -8,7 +8,7 @@ use winit::{
 fn main() {
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
-        .with_title("Milun Quickstart Example")
+        .with_title("WFFL Quickstart Example")
         .build(&event_loop)
         .unwrap();
 

@@ -744,18 +744,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "milun"
-version = "0.0.0"
-dependencies = [
- "bytemuck",
- "hashbrown 0.14.0",
- "image",
- "pollster",
- "wgpu",
- "winit",
-]
-
-[[package]]
 name = "minimal-lexical"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1551,6 +1539,18 @@ checksum = "9b85cbef8c220a6abc02aefd892dfc0fc23afb1c6a426316ec33253a3877249b"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "wffl"
+version = "0.0.0"
+dependencies = [
+ "bytemuck",
+ "hashbrown 0.14.0",
+ "image",
+ "pollster",
+ "wgpu",
+ "winit",
 ]
 
 [[package]]
