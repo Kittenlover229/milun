@@ -1,0 +1,10 @@
+[package]
+name = "milun"
+version = "0.0.0"
+edition = "2021"
+resolver = "2"
+
+[dependencies]
+pollster = "0.3"
+wgpu = "0.17.0"
+winit = "0.28"
