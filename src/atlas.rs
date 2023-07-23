@@ -1,121 +1,134 @@
-use hashbrown::HashMap;
-use wgpu::{util::DeviceExt, BufferUsages};
+use image::RgbaImage;
 
 use crate::Renderer;
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Sprite {
-    pub texture_idx: u32,
-    pub indices: (u32, u32),
+#[must_use]
+pub struct Atlas<'renderer> {
+    pub(crate) rgba: Vec<RgbaImage>,
+    pub(crate) renderer: &'renderer mut Renderer,
 }
 
-#[derive(Debug)]
-pub struct Atlas {
-    pub textures: (wgpu::Texture, wgpu::TextureView),
-    pub sampler: wgpu::Sampler,
-    pub bind_group: wgpu::BindGroup,
+impl Atlas<'_> {
+    pub fn finalize(mut self) {
+        self.rgba
+            .sort_by_key(|rgba| rgba.dimensions().0 * rgba.dimensions().1);
+        self.rgba.reverse();
 
-    pub vertex_buffer: wgpu::Buffer,
-    pub index_buffer: wgpu::Buffer,
+        let width = self.rgba.iter().map(|buffer| buffer.dimensions().0).sum();
+        let height = self
+            .rgba
+            .iter()
+            .map(|buffer| buffer.dimensions().1)
+            .max()
+            .unwrap_or(0);
 
-    pub(crate) sprites: Vec<Sprite>,
-    pub(crate) named_sprites: HashMap<String, usize>,
-}
+        let mut buffer = RgbaImage::new(width, height);
+        for pixel in buffer.pixels_mut() {
+            *pixel = image::Rgba([0; 4]);
+        }
 
-impl Atlas {
-    pub fn from_device(device: &wgpu::Device) -> Self {
-        let sampler = device.create_sampler(&Self::sampling_options());
+        let mut i = 0;
+        for buf in self.rgba {
+            for (from, to) in buf.rows().zip(buffer.rows_mut()) {
+                for (new_color, pixel) in from.zip(to.skip(i)) {
+                    *pixel = *new_color;
+                }
+            }
 
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Atlas Vertex Buffer"),
-            contents: &[],
-            usage: BufferUsages::VERTEX,
-        });
+            i += buf.dimensions().1 as usize;
+        }
 
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Atlas Index Buffer"),
-            contents: &[],
-            usage: BufferUsages::INDEX,
-        });
-
-        let layout = &device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
-                    count: None,
-                },
-            ],
-            label: Some("Atlas Bind Layout"),
-        });
-
-        let size = wgpu::Extent3d {
-            width: 1,
-            height: 1,
+        let texture_size = wgpu::Extent3d {
+            width,
+            height,
             depth_or_array_layers: 1,
         };
 
-        let texture = device.create_texture(&wgpu::TextureDescriptor {
-            size,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            label: Some("Atlas Texture"),
-            view_formats: &[],
-        });
+        let texture = self
+            .renderer
+            .device()
+            .create_texture(&wgpu::TextureDescriptor {
+                size: texture_size,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                label: Some("texture"),
+                view_formats: &[],
+            });
+
+        self.renderer.queue().write_texture(
+            wgpu::ImageCopyTexture {
+                texture: &texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            &buffer,
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: Some(4 * width),
+                rows_per_image: Some(height),
+            },
+            texture_size,
+        );
 
         let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&texture_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&sampler),
-                },
-            ],
-            label: Some("Atlas Bind Group"),
-        });
+        let texture_bind_group_layout =
+            self.renderer
+                .device()
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    entries: &[
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Texture {
+                                multisampled: false,
+                                view_dimension: wgpu::TextureViewDimension::D2,
+                                sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            },
+                            count: None,
+                        },
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                            count: None,
+                        },
+                    ],
+                    label: Some("texture_bind_group_layout"),
+                });
 
-        Self {
-            textures: (texture, texture_view),
-            sampler,
-            vertex_buffer,
-            index_buffer,
-            bind_group,
-            sprites: vec![],
-            named_sprites: Default::default(),
-        }
+        let bind_group = self
+            .renderer
+            .device()
+            .create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &texture_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&texture_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&self.renderer.atlas_sampler),
+                    },
+                ],
+                label: Some("diffuse_bind_group"),
+            });
+
+        self.renderer.atlas_texture = (texture, texture_view);
+        self.renderer.atlas_bind_group = bind_group;
     }
-}
 
-impl Atlas {
-    pub fn sampling_options() -> wgpu::SamplerDescriptor<'static> {
-        wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Nearest,
-            ..Default::default()
-        }
+    pub fn finalize_and_repack(self) {
+        todo!()
+    }
+
+    pub fn add_rgba8(mut self, buffer: RgbaImage) -> Self {
+        self.rgba.push(RgbaImage::from(buffer.into()));
+        self
     }
 }

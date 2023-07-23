@@ -12,7 +12,20 @@ fn main() {
         .build(&event_loop)
         .unwrap();
 
+    let texture_16x16 = image::load_from_memory(include_bytes!("16x16.png"))
+        .unwrap()
+        .to_rgba8();
+    let texture_8x8 = image::load_from_memory(include_bytes!("8x8.png"))
+        .unwrap()
+        .to_rgba8();
+
     let mut renderer = Renderer::from(window);
+    renderer
+        .atlas()
+        .add_rgba8(texture_16x16)
+        .add_rgba8(texture_8x8.clone())
+        .add_rgba8(texture_8x8.clone())
+        .finalize();
 
     event_loop.run(move |event, _, control_flow| {
         let window = renderer.window();

@@ -6,7 +6,15 @@ resolver = "2"
 
 [dependencies]
 bytemuck = { version = "1.13", features = [ "derive" ] }
-hashbrown = "0.14.0"
+hashbrown = "0.14"
 pollster = "0.3"
-wgpu = "0.17.0"
 winit = "0.28"
+
+[dependencies.wgpu]
+version = "0.17"
+features = ["trace", "webgl"]
+
+[dependencies.image]
+version = "0.24"
+default-features = false
+features = ["png", "jpeg"]
