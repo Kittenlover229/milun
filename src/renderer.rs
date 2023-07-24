@@ -1,7 +1,7 @@
 use wgpu::{util::DeviceExt, Buffer};
 use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window};
 
-use crate::{Atlas, Vertex, INDICES, VERTICES};
+use crate::{Atlas, Sprite, Vertex};
 
 pub struct Renderer {
     surface: wgpu::Surface,
@@ -9,6 +9,7 @@ pub struct Renderer {
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     render_pipeline: wgpu::RenderPipeline,
+    pub(crate) layout: wgpu::BindGroupLayout,
 
     size: PhysicalSize<u32>,
     window: Window,
@@ -16,10 +17,9 @@ pub struct Renderer {
     pub(crate) atlas_texture: (wgpu::Texture, wgpu::TextureView),
     pub(crate) atlas_sampler: wgpu::Sampler,
     pub(crate) atlas_bind_group: wgpu::BindGroup,
-
-    vertex_buffer: Buffer,
-    index_buffer: Buffer,
-    num_indices: usize,
+    pub(crate) sprites: Vec<Sprite>,
+    pub(crate) vertex_buffer: Buffer,
+    pub(crate) index_buffer: Buffer,
 }
 
 impl From<Window> for Renderer {
@@ -93,15 +93,46 @@ impl Renderer {
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(&VERTICES),
+            contents: &[],
             usage: wgpu::BufferUsages::VERTEX,
         });
 
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(INDICES),
+            contents: &[],
             usage: wgpu::BufferUsages::INDEX,
         });
+
+        let sampler = device.create_sampler(&Self::sampling_options());
+
+        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                    count: None,
+                },
+            ],
+            label: Some("Bind Layout"),
+        });
+
+        let render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Render Pipeline Layout"),
+                bind_group_layouts: &[&layout],
+                push_constant_ranges: &[],
+            });
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Render Pipeline"),
@@ -138,31 +169,6 @@ impl Renderer {
             multiview: None,
         });
 
-        let num_indices = INDICES.len();
-        let sampler = device.create_sampler(&Self::sampling_options());
-
-        let layout = &device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
-                    count: None,
-                },
-            ],
-            label: Some("Bind Layout"),
-        });
-
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             size: wgpu::Extent3d {
                 width: 1,
@@ -181,7 +187,7 @@ impl Renderer {
         let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout,
+            layout: &layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
@@ -198,17 +204,18 @@ impl Renderer {
         Self {
             atlas_texture: (texture, texture_view),
             size,
+            sprites: vec![],
             atlas_sampler: sampler,
             atlas_bind_group: bind_group,
             vertex_buffer,
             index_buffer,
-            num_indices,
             window,
             surface,
             device,
             queue,
             config,
             render_pipeline,
+            layout,
         }
     }
 }
@@ -306,9 +313,9 @@ impl Renderer {
 
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
             render_pass.set_bind_group(0, &self.atlas_bind_group, &[]);
-            render_pass.draw_indexed(0..self.num_indices as u32, 0, 0..1);
+            render_pass.draw_indexed(self.sprites[2].indices(), 0, 0..1);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
