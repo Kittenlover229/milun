@@ -7,6 +7,7 @@ resolver = "2"
 [dependencies]
 bytemuck = { version = "1.13", features = [ "derive" ] }
 hashbrown = "0.14"
+mint = "0.5.9"
 pollster = "0.3"
 winit = "0.28"
 

@@ -1,14 +1,16 @@
+use bytemuck::{Pod, Zeroable};
+use mint::Vector2;
 use wgpu::{util::DeviceExt, Buffer};
 use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window};
 
-use crate::{Atlas, Sprite, Vertex};
+use crate::{Atlas, Sprite, SpriteIndex, Vertex};
 
 pub struct Renderer {
-    surface: wgpu::Surface,
-    device: wgpu::Device,
-    queue: wgpu::Queue,
-    config: wgpu::SurfaceConfiguration,
-    render_pipeline: wgpu::RenderPipeline,
+    pub(crate) surface: wgpu::Surface,
+    pub(crate) device: wgpu::Device,
+    pub(crate) queue: wgpu::Queue,
+    pub(crate) config: wgpu::SurfaceConfiguration,
+    pub(crate) render_pipeline: wgpu::RenderPipeline,
     pub(crate) layout: wgpu::BindGroupLayout,
 
     size: PhysicalSize<u32>,
@@ -20,6 +22,7 @@ pub struct Renderer {
     pub(crate) sprites: Vec<Sprite>,
     pub(crate) vertex_buffer: Buffer,
     pub(crate) index_buffer: Buffer,
+    pub(crate) instance_buffer: Buffer,
 }
 
 impl From<Window> for Renderer {
@@ -84,13 +87,6 @@ impl Renderer {
             source: wgpu::ShaderSource::Wgsl(include_str!("./shaders/main.wgsl").into()),
         });
 
-        let render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[],
-                push_constant_ranges: &[],
-            });
-
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
             contents: &[],
@@ -101,6 +97,13 @@ impl Renderer {
             label: Some("Index Buffer"),
             contents: &[],
             usage: wgpu::BufferUsages::INDEX,
+        });
+
+        let instance_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size: 0b1 << 10,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
         });
 
         let sampler = device.create_sampler(&Self::sampling_options());
@@ -140,7 +143,7 @@ impl Renderer {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
-                buffers: &[Vertex::layout()],
+                buffers: &[Vertex::layout(), Instance::layout()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
@@ -203,6 +206,7 @@ impl Renderer {
 
         Self {
             atlas_texture: (texture, texture_view),
+            instance_buffer,
             size,
             sprites: vec![],
             atlas_sampler: sampler,
@@ -314,11 +318,139 @@ impl Renderer {
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
             render_pass.set_bind_group(0, &self.atlas_bind_group, &[]);
             render_pass.draw_indexed(self.sprites[2].indices(), 0, 0..1);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
+        output.present();
+
+        Ok(())
+    }
+
+    pub fn begin_frame<'renderer>(&'renderer mut self) -> FrameBuilder<'renderer> {
+        FrameBuilder {
+            renderer: self,
+            draw_sprites: vec![],
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct Instance {
+    position: Vector2<f32>,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy, Default, Zeroable, Pod)]
+#[repr(C)]
+pub struct RawInstance {
+    position: [f32; 2],
+}
+
+impl Instance {
+    pub fn raw(&self) -> RawInstance {
+        RawInstance {
+            position: [self.position.x, self.position.y],
+        }
+    }
+
+    pub fn layout() -> wgpu::VertexBufferLayout<'static> {
+        use std::mem;
+        wgpu::VertexBufferLayout {
+            array_stride: mem::size_of::<RawInstance>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &[wgpu::VertexAttribute {
+                offset: 0,
+                shader_location: 2,
+                format: wgpu::VertexFormat::Float32x2,
+            }],
+        }
+    }
+}
+
+pub struct FrameBuilder<'renderer> {
+    renderer: &'renderer mut Renderer,
+    draw_sprites: Vec<(SpriteIndex, Instance)>,
+}
+
+impl FrameBuilder<'_> {
+    pub fn draw_sprite(
+        mut self,
+        sprite_idx: SpriteIndex,
+        position: impl Into<Vector2<f32>>,
+    ) -> Self {
+        self.draw_sprites.push((
+            sprite_idx,
+            Instance {
+                position: position.into(),
+            },
+        ));
+        self
+    }
+
+    pub fn end_frame(self) -> Result<(), wgpu::SurfaceError> {
+        let output = self.renderer.surface.get_current_texture()?;
+
+        let view = output
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
+        let mut encoder =
+            self.renderer
+                .device()
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Render Encoder"),
+                });
+
+        let (sprite_indices, instances): (Vec<_>, Vec<_>) = self.draw_sprites.into_iter().unzip();
+
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.1,
+                            g: 0.1,
+                            b: 0.1,
+                            a: 1.0,
+                        }),
+                        store: true,
+                    },
+                })],
+                depth_stencil_attachment: None,
+            });
+
+            render_pass.set_pipeline(&self.renderer.render_pipeline);
+            render_pass.set_vertex_buffer(0, self.renderer.vertex_buffer.slice(..));
+            render_pass.set_index_buffer(
+                self.renderer.index_buffer.slice(..),
+                wgpu::IndexFormat::Uint32,
+            );
+            render_pass.set_bind_group(0, &self.renderer.atlas_bind_group, &[]);
+            self.renderer.queue.write_buffer(
+                &self.renderer.instance_buffer,
+                0,
+                bytemuck::cast_slice(
+                    &instances
+                        .into_iter()
+                        .map(|instance| instance.raw())
+                        .collect::<Vec<_>>(),
+                ),
+            );
+            render_pass.set_vertex_buffer(1, self.renderer.instance_buffer.slice(..));
+
+            for sprite_idx in sprite_indices {
+                render_pass.draw_indexed(self.renderer.sprites[sprite_idx].indices(), 0, 0..1);
+            }
+        }
+
+        self.renderer
+            .queue
+            .submit(std::iter::once(encoder.finish()));
         output.present();
 
         Ok(())

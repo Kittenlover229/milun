@@ -57,7 +57,9 @@ fn main() {
             }
 
             Event::RedrawRequested(window_id) if window_id == renderer.window().id() => {
-                match renderer.render() {
+                let result = renderer.begin_frame().draw_sprite(0, [0., 0.]).end_frame();
+
+                match result {
                     Ok(_) => {}
                     Err(wgpu::SurfaceError::Lost) => renderer.resize(renderer.size()),
                     Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
