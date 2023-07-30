@@ -1,0 +1,34 @@
+targets = [
+  { triple = "aarch64-apple-darwin" },
+  { triple = "i686-pc-windows-gnu" },
+  { triple = "i686-pc-windows-msvc" },
+  { triple = "i686-unknown-linux-gnu" },
+  { triple = "wasm32-unknown-unknown" },
+  { triple = "x86_64-apple-darwin" },
+  { triple = "x86_64-pc-windows-gnu" },
+  { triple = "x86_64-pc-windows-msvc" },
+  { triple = "x86_64-unknown-linux-gnu" },
+  { triple = "x86_64-unknown-linux-musl" },
+  { triple = "x86_64-unknown-redox" },
+]
+
+[advisories]
+vulnerability = "deny"
+unmaintained = "warn"
+yanked = "deny"
+
+[licenses]
+unlicensed = "deny"
+allow-osi-fsf-free = "neither"
+confidence-threshold = 0.95
+copyleft = "deny"
+allow = [
+  "Apache-2.0",                     # https://tldrlegal.com/license/apache-license-2.0-(apache-2.0)
+  "BSD-2-Clause",                   # https://tldrlegal.com/license/bsd-2-clause-license-(freebsd)
+  "BSD-3-Clause",                   # https://tldrlegal.com/license/bsd-3-clause-license-(revised)
+  "CC0-1.0",                        # https://creativecommons.org/publicdomain/zero/1.0/
+  "ISC",                            # https://tldrlegal.com/license/-isc-license
+  "MIT",                            # https://tldrlegal.com/license/mit-license
+  "Unicode-DFS-2016",               # https://spdx.org/licenses/Unicode-DFS-2016.html
+  "Zlib",                           # https://tldrlegal.com/license/zlib-libpng-license-(zlib)
+]
