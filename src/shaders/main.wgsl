@@ -14,7 +14,7 @@ struct InstanceInput {
 };
 
 struct Camera {
-    pos: vec2<f32>,
+    view: mat4x4<f32>,
 }
 
 @group(0) @binding(0)
@@ -33,7 +33,7 @@ fn vs_main(
     var out: VertexOutput;
     out.tex_coords = model.texture_coordinates;
     out.tint = vec3<f32>(1.0, 1.0, 1.0);
-    out.clip_position = vec4<f32>(vec3<f32>(instance.pos - camera.pos, 0.0) + model.position, 1.0);
+    out.clip_position = camera.view * vec4<f32>(vec3<f32>(instance.pos, 0.0) + model.position, 1.0);
     return out;
 }
 
