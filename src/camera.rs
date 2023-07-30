@@ -27,10 +27,10 @@ impl Camera {
 
     pub(crate) fn view(&self) -> ColumnMatrix4<f32> {
         ColumnMatrix4 {
-            x: [1. / (self.aspect_ratio), 0., 0., 0.].into(),
-            y: [0., 1., 0., 0.].into(),
-            z: [0., 0., 1., 0.].into(),
-            w: [self.position.x, self.position.y, 0., 1.].into(),
+            x: [1. / (self.aspect_ratio * self.size), 0., 0., 0.].into(),
+            y: [0., 1. / self.size, 0., 0.].into(),
+            z: [0., 0., 1. / self.size, 0.].into(),
+            w: [self.position.x, -self.position.y, 0., 1.].into(),
         }
     }
 }
