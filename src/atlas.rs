@@ -134,7 +134,7 @@ impl Atlas<'_> {
 
         let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let texture_bind_group_layout = &self.renderer.layout;
+        let texture_bind_group_layout = &self.renderer.atlas_bind_group_layout;
 
         self.renderer.index_buffer =
             self.renderer
@@ -173,7 +173,7 @@ impl Atlas<'_> {
             });
 
         self.renderer.atlas_texture = (texture, texture_view);
-        self.renderer.atlas_bind_group = bind_group;
+        self.renderer.cold_bind_group = bind_group;
         self.renderer.sprites = sprites;
 
         sprite_indices

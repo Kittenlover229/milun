@@ -1,9 +1,11 @@
+use std::num::NonZeroU64;
+
 use bytemuck::{Pod, Zeroable};
 use mint::Vector2;
-use wgpu::{util::DeviceExt, Buffer};
+use wgpu::{util::DeviceExt, Buffer, BufferDescriptor, BufferUsages};
 use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window};
 
-use crate::{Atlas, Sprite, SpriteIndex, Vertex};
+use crate::{Atlas, Camera, CameraRaw, Sprite, SpriteIndex, Vertex};
 
 pub struct Renderer {
     pub(crate) surface: wgpu::Surface,
@@ -11,14 +13,22 @@ pub struct Renderer {
     pub(crate) queue: wgpu::Queue,
     pub(crate) config: wgpu::SurfaceConfiguration,
     pub(crate) render_pipeline: wgpu::RenderPipeline,
-    pub(crate) layout: wgpu::BindGroupLayout,
 
     size: PhysicalSize<u32>,
     window: Window,
 
     pub(crate) atlas_texture: (wgpu::Texture, wgpu::TextureView),
+    pub(crate) atlas_bind_group_layout: wgpu::BindGroupLayout,
     pub(crate) atlas_sampler: wgpu::Sampler,
-    pub(crate) atlas_bind_group: wgpu::BindGroup,
+    pub(crate) camera_buffer: wgpu::Buffer,
+
+    // Bind Group for data that rarely changes
+    pub(crate) cold_bind_group: wgpu::BindGroup,
+    // Bind Group for data that changes often
+    pub(crate) hot_bind_group: wgpu::BindGroup,
+
+    pub(crate) camera: Camera,
+
     pub(crate) sprites: Vec<Sprite>,
     pub(crate) vertex_buffer: Buffer,
     pub(crate) index_buffer: Buffer,
@@ -108,32 +118,48 @@ impl Renderer {
 
         let sampler = device.create_sampler(&Self::sampling_options());
 
-        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
+        let cold_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                        count: None,
+                    },
+                ],
+                label: Some("Cold Bind Layout"),
+            });
+
+        let hot_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[wgpu::BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
                     },
                     count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
-                    count: None,
-                },
-            ],
-            label: Some("Bind Layout"),
-        });
+                }],
+                label: Some("Hot Bind Layout"),
+            });
 
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[&layout],
+                bind_group_layouts: &[&cold_bind_group_layout, &hot_bind_group_layout],
                 push_constant_ranges: &[],
             });
 
@@ -172,7 +198,7 @@ impl Renderer {
             multiview: None,
         });
 
-        let texture = device.create_texture(&wgpu::TextureDescriptor {
+        let atlas_texture = device.create_texture(&wgpu::TextureDescriptor {
             size: wgpu::Extent3d {
                 width: 1,
                 height: 1,
@@ -187,30 +213,55 @@ impl Renderer {
             view_formats: &[],
         });
 
-        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let atlas_texture_view = atlas_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &layout,
+        let cold_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &cold_bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&texture_view),
+                    resource: wgpu::BindingResource::TextureView(&atlas_texture_view),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
                     resource: wgpu::BindingResource::Sampler(&sampler),
                 },
             ],
-            label: Some("Atlas Bind Group"),
+            label: Some("Cold Bind Group"),
+        });
+
+        let camera = Camera::default();
+
+        let camera_buffer = device.create_buffer(&BufferDescriptor {
+            label: Some("Camera Buffer"),
+            size: std::mem::size_of::<CameraRaw>() as u64,
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        queue.write_buffer(&camera_buffer, 0, bytemuck::bytes_of(&camera.raw()));
+
+        let hot_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &hot_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: camera_buffer.as_entire_binding(),
+            }],
+            label: Some("Cold Bind Group"),
         });
 
         Self {
-            atlas_texture: (texture, texture_view),
+            cold_bind_group,
+            hot_bind_group,
+            atlas_bind_group_layout: cold_bind_group_layout,
+
+            camera: Default::default(),
+            camera_buffer,
+
+            atlas_texture: (atlas_texture, atlas_texture_view),
             instance_buffer,
             size,
             sprites: vec![],
             atlas_sampler: sampler,
-            atlas_bind_group: bind_group,
             vertex_buffer,
             index_buffer,
             window,
@@ -219,7 +270,6 @@ impl Renderer {
             queue,
             config,
             render_pipeline,
-            layout,
         }
     }
 }
@@ -281,52 +331,6 @@ impl Renderer {
 
     pub fn size(&self) -> PhysicalSize<u32> {
         self.size
-    }
-
-    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        let output = self.surface.get_current_texture()?;
-
-        let view = output
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Render Encoder"),
-            });
-
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.1,
-                            g: 0.1,
-                            b: 0.1,
-                            a: 1.0,
-                        }),
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: None,
-            });
-
-            render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-            render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
-            render_pass.set_bind_group(0, &self.atlas_bind_group, &[]);
-            render_pass.draw_indexed(self.sprites[2].indices(), 0, 0..1);
-        }
-
-        self.queue.submit(std::iter::once(encoder.finish()));
-        output.present();
-
-        Ok(())
     }
 
     pub fn begin_frame<'renderer>(&'renderer mut self) -> FrameBuilder<'renderer> {
@@ -430,7 +434,9 @@ impl FrameBuilder<'_> {
                 self.renderer.index_buffer.slice(..),
                 wgpu::IndexFormat::Uint32,
             );
-            render_pass.set_bind_group(0, &self.renderer.atlas_bind_group, &[]);
+            render_pass.set_bind_group(0, &self.renderer.cold_bind_group, &[]);
+            render_pass.set_bind_group(1, &self.renderer.hot_bind_group, &[]);
+
             self.renderer.queue.write_buffer(
                 &self.renderer.instance_buffer,
                 0,
