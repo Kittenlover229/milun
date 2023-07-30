@@ -11,8 +11,8 @@ pub struct Camera {
 impl Default for Camera {
     fn default() -> Self {
         Self {
-            position: [0., 0.].into(),
-            size: 1.,
+            position: [0., 2.].into(),
+            size: 2.,
             aspect_ratio: 1.,
         }
     }
@@ -30,7 +30,7 @@ impl Camera {
             x: [1. / (self.aspect_ratio * self.size), 0., 0., 0.].into(),
             y: [0., 1. / self.size, 0., 0.].into(),
             z: [0., 0., 1. / self.size, 0.].into(),
-            w: [self.position.x, -self.position.y, 0., 1.].into(),
+            w: [self.position.x / self.size, -self.position.y / self.size, 0., 1.].into(),
         }
     }
 }
