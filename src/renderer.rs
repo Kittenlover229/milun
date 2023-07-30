@@ -18,6 +18,8 @@ pub struct Renderer {
     pub(crate) atlas_texture: (wgpu::Texture, wgpu::TextureView),
     pub(crate) atlas_bind_group_layout: wgpu::BindGroupLayout,
     pub(crate) atlas_sampler: wgpu::Sampler,
+
+    pub(crate) camera: Camera,
     pub(crate) camera_buffer: wgpu::Buffer,
 
     // Bind Group for data that rarely changes
@@ -25,12 +27,12 @@ pub struct Renderer {
     // Bind Group for data that changes often
     pub(crate) hot_bind_group: wgpu::BindGroup,
 
-    pub(crate) camera: Camera,
+    pub(crate) instance_count: u64,
+    pub(crate) instance_buffer: Buffer,
 
     pub(crate) sprites: Vec<Sprite>,
     pub(crate) vertex_buffer: Buffer,
     pub(crate) index_buffer: Buffer,
-    pub(crate) instance_buffer: Buffer,
 }
 
 impl From<Window> for Renderer {
@@ -109,7 +111,7 @@ impl Renderer {
 
         let instance_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: None,
-            size: 0b1 << 10,
+            size: std::mem::size_of::<RawSpriteInstance>() as _,
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -256,6 +258,7 @@ impl Renderer {
             camera_buffer,
 
             atlas_texture: (atlas_texture, atlas_texture_view),
+            instance_count: 1,
             instance_buffer,
             size,
             sprites: vec![],
@@ -343,6 +346,18 @@ impl Renderer {
             draw_sprites: vec![],
         }
     }
+
+    pub(crate) fn reserve_instance_buffer_for(&mut self, new_instance_count: u64) {
+        if new_instance_count > self.instance_count as u64 {
+            self.instance_count = new_instance_count;
+            self.device.create_buffer(&BufferDescriptor {
+                label: None,
+                size: self.instance_count * std::mem::size_of::<RawSpriteInstance>() as u64,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: true,
+            });
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -405,14 +420,17 @@ impl FrameBuilder<'_> {
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
+        let (sprite_indices, instances): (Vec<_>, Vec<_>) = self.draw_sprites.into_iter().unzip();
+
+        self.renderer
+            .reserve_instance_buffer_for(instances.len() as _);
+
         let mut encoder =
             self.renderer
                 .device()
                 .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                     label: Some("Render Encoder"),
                 });
-
-        let (sprite_indices, instances): (Vec<_>, Vec<_>) = self.draw_sprites.into_iter().unzip();
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
