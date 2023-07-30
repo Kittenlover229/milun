@@ -1,5 +1,3 @@
-use std::num::NonZeroU64;
-
 use bytemuck::{Pod, Zeroable};
 use mint::Vector2;
 use wgpu::{util::DeviceExt, Buffer, BufferDescriptor, BufferUsages};
@@ -169,7 +167,7 @@ impl Renderer {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
-                buffers: &[Vertex::layout(), Instance::layout()],
+                buffers: &[Vertex::layout(), SpriteInstance::layout()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
@@ -348,19 +346,19 @@ impl Renderer {
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub struct Instance {
+pub struct SpriteInstance {
     position: Vector2<f32>,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy, Default, Zeroable, Pod)]
 #[repr(C)]
-pub struct RawInstance {
+pub struct RawSpriteInstance {
     position: [f32; 2],
 }
 
-impl Instance {
-    pub fn raw(&self) -> RawInstance {
-        RawInstance {
+impl SpriteInstance {
+    pub fn raw(&self) -> RawSpriteInstance {
+        RawSpriteInstance {
             position: self.position.into(),
         }
     }
@@ -368,7 +366,7 @@ impl Instance {
     pub fn layout() -> wgpu::VertexBufferLayout<'static> {
         use std::mem;
         wgpu::VertexBufferLayout {
-            array_stride: mem::size_of::<RawInstance>() as wgpu::BufferAddress,
+            array_stride: mem::size_of::<RawSpriteInstance>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Instance,
             attributes: &[wgpu::VertexAttribute {
                 offset: 0,
@@ -379,9 +377,10 @@ impl Instance {
     }
 }
 
+#[must_use]
 pub struct FrameBuilder<'renderer> {
     renderer: &'renderer mut Renderer,
-    draw_sprites: Vec<(SpriteIndex, Instance)>,
+    draw_sprites: Vec<(SpriteIndex, SpriteInstance)>,
 }
 
 impl FrameBuilder<'_> {
@@ -392,7 +391,7 @@ impl FrameBuilder<'_> {
     ) -> Self {
         self.draw_sprites.push((
             sprite_idx,
-            Instance {
+            SpriteInstance {
                 position: position.into(),
             },
         ));
