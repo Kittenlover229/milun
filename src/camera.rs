@@ -4,8 +4,7 @@ use mint::{ColumnMatrix4, Vector2};
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Camera {
     pub position: Vector2<f32>,
-    pub zoom_factor: f32,
-    pub min_max: (Vector2<f32>, Vector2<f32>),
+    pub size: f32,
     pub aspect_ratio: f32,
 }
 
@@ -13,8 +12,7 @@ impl Default for Camera {
     fn default() -> Self {
         Self {
             position: [0., 0.].into(),
-            zoom_factor: 1.,
-            min_max: ([-1., -1.].into(), [1., 1.].into()),
+            size: 1.,
             aspect_ratio: 1.,
         }
     }
@@ -29,10 +27,10 @@ impl Camera {
 
     pub(crate) fn view(&self) -> ColumnMatrix4<f32> {
         ColumnMatrix4 {
-            x: [1., 0., 0., 0.].into(),
+            x: [1. / (self.aspect_ratio), 0., 0., 0.].into(),
             y: [0., 1., 0., 0.].into(),
             z: [0., 0., 1., 0.].into(),
-            w: [0., 0., 0., 1.].into(),
+            w: [self.position.x, self.position.y, 0., 1.].into(),
         }
     }
 }

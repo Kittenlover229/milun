@@ -326,6 +326,12 @@ impl Renderer {
             self.config.width = new_size.width;
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
+            self.camera.aspect_ratio = new_size.width as f32 / new_size.height as f32;
+            self.queue.write_buffer(
+                &self.camera_buffer,
+                0,
+                bytemuck::bytes_of(&self.camera.raw()),
+            );
         }
     }
 
@@ -355,7 +361,7 @@ pub struct RawInstance {
 impl Instance {
     pub fn raw(&self) -> RawInstance {
         RawInstance {
-            position: [self.position.x, self.position.y],
+            position: self.position.into(),
         }
     }
 
