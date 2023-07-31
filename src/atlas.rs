@@ -7,39 +7,40 @@ use crate::{vertex::Vertex, Renderer};
 
 pub type SpriteIndex = usize;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Sprite {
     pub sprite_index_range: (u32, u32),
 }
 
 impl Sprite {
     pub fn indices(&self) -> Range<u32> {
-        self.sprite_index_range.0 as u32..self.sprite_index_range.1 as u32
+        self.sprite_index_range.0..self.sprite_index_range.1
     }
 }
 
 #[must_use]
-pub struct Atlas<'renderer> {
+pub struct AtlasBuilder<'renderer> {
     pub(crate) rgba: Vec<RgbaImage>,
     pub(crate) renderer: &'renderer mut Renderer,
 }
 
-impl Atlas<'_> {
-    pub fn finalize(mut self) -> Vec<SpriteIndex> {
+impl AtlasBuilder<'_> {
+    pub fn finalize(self) -> Vec<SpriteIndex> {
         let mut sprite_indices = vec![];
         let mut sprites = vec![];
         let mut vertices = vec![];
         let mut indices = vec![];
+        let mut rgba = self.rgba;
 
-        self.rgba
-            .sort_by_key(|rgba| rgba.dimensions().0 * rgba.dimensions().1);
-        self.rgba.reverse();
+        rgba.sort_by_key(|rgba| rgba.dimensions().0 * rgba.dimensions().1);
+        rgba.reverse();
 
-        let width = self.rgba.iter().map(|buffer| buffer.dimensions().0).sum();
-        let height = self
-            .rgba
+        let width = rgba.iter().map(|buffer| buffer.dimensions().0).sum();
+        let height = rgba
             .iter()
             .map(|buffer| buffer.dimensions().1)
-            .fold(0, |acc, x| acc.max(x));
+            .max()
+            .unwrap_or(0);
 
         let mut buffer = RgbaImage::new(width, height);
         for pixel in buffer.pixels_mut() {
@@ -51,7 +52,7 @@ impl Atlas<'_> {
         let x_step = 1. / width as f32;
         let y_step = 1. / height as f32;
 
-        for (i, buf) in self.rgba.into_iter().enumerate() {
+        for (i, buf) in rgba.into_iter().enumerate() {
             for (from, to) in buf.rows().zip(buffer.rows_mut()) {
                 for (new_color, pixel) in from.zip(to.skip(offset)) {
                     *pixel = *new_color;
@@ -61,29 +62,26 @@ impl Atlas<'_> {
             let verts = [
                 Vertex {
                     position: [-0.5, -0.5, 0.0],
-                    tex_coords: [0.0, y_step * buf.height() as f32],
+                    tex_coords: [x, y_step * buf.height() as f32],
                 },
                 Vertex {
                     position: [0.5, -0.5, 0.0],
-                    tex_coords: [x_step * buf.width() as f32, y_step * buf.height() as f32],
+                    tex_coords: [
+                        x + x_step * buf.width() as f32,
+                        y_step * buf.height() as f32,
+                    ],
                 },
                 Vertex {
                     position: [-0.5, 0.5, 0.0],
-                    tex_coords: [0.0, 0.0],
+                    tex_coords: [x, 0.0],
                 },
                 Vertex {
                     position: [0.5, 0.5, 0.0],
-                    tex_coords: [x_step * buf.width() as f32, 0.0],
+                    tex_coords: [x + x_step * buf.width() as f32, 0.0],
                 },
-            ]
-            .map(|mut v| {
-                v.tex_coords[0] += x;
-                v
-            });
+            ];
 
-            let inds = [0, 1, 2, 1, 3, 2]
-                .into_iter()
-                .map(|i| i + vertices.len() as u32);
+            let inds = [0, 1, 2, 1, 3, 2].map(|i| i + vertices.len() as u32);
 
             sprites.push(Sprite {
                 sprite_index_range: (indices.len() as u32, (indices.len() + inds.len()) as u32),
@@ -112,7 +110,7 @@ impl Atlas<'_> {
                 dimension: wgpu::TextureDimension::D2,
                 format: wgpu::TextureFormat::Rgba8UnormSrgb,
                 usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                label: Some("texture"),
+                label: None,
                 view_formats: &[],
             });
 
@@ -158,7 +156,7 @@ impl Atlas<'_> {
             .renderer
             .device()
             .create_bind_group(&wgpu::BindGroupDescriptor {
-                layout: &texture_bind_group_layout,
+                layout: texture_bind_group_layout,
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
@@ -184,7 +182,7 @@ impl Atlas<'_> {
     }
 
     pub fn add_image(mut self, buffer: impl Into<DynamicImage>) -> Self {
-        self.rgba.push(DynamicImage::from(buffer.into()).to_rgba8());
+        self.rgba.push(buffer.into().to_rgba8());
         self
     }
 }

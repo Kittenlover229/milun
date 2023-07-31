@@ -11,8 +11,8 @@ pub struct Camera {
 impl Default for Camera {
     fn default() -> Self {
         Self {
-            position: [0., 2.].into(),
-            size: 2.,
+            position: [0., 0.].into(),
+            size: 3.,
             aspect_ratio: 1.,
         }
     }

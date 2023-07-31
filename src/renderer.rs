@@ -1,9 +1,13 @@
+use std::{
+    cell::{RefCell, RefMut},
+};
+
 use bytemuck::{Pod, Zeroable};
 use mint::Vector2;
 use wgpu::{util::DeviceExt, Buffer, BufferDescriptor, BufferUsages};
 use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window};
 
-use crate::{Atlas, Camera, CameraRaw, Sprite, SpriteIndex, Vertex};
+use crate::{AtlasBuilder, Camera, CameraRaw, Sprite, SpriteIndex, Vertex};
 
 pub struct Renderer {
     pub(crate) surface: wgpu::Surface,
@@ -12,14 +16,14 @@ pub struct Renderer {
     pub(crate) config: wgpu::SurfaceConfiguration,
     pub(crate) render_pipeline: wgpu::RenderPipeline,
 
-    size: PhysicalSize<u32>,
-    window: Window,
+    pub(crate) size: PhysicalSize<u32>,
+    pub(crate) window: Window,
 
     pub(crate) atlas_texture: (wgpu::Texture, wgpu::TextureView),
     pub(crate) atlas_bind_group_layout: wgpu::BindGroupLayout,
     pub(crate) atlas_sampler: wgpu::Sampler,
 
-    pub(crate) camera: Camera,
+    pub(crate) camera: RefCell<Camera>,
     pub(crate) camera_buffer: wgpu::Buffer,
 
     // Bind Group for data that rarely changes
@@ -302,8 +306,12 @@ impl Renderer {
         &self.window
     }
 
-    pub fn atlas<'device>(&'device mut self) -> Atlas<'device> {
-        Atlas {
+    pub fn camera_mut(&self) -> RefMut<'_, Camera> {
+        self.camera.borrow_mut()
+    }
+
+    pub fn atlas(&mut self) -> AtlasBuilder<'_> {
+        AtlasBuilder {
             renderer: self,
             rgba: vec![],
         }
@@ -327,20 +335,24 @@ impl Renderer {
             self.config.width = new_size.width;
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
-            self.camera.aspect_ratio = new_size.width as f32 / new_size.height as f32;
-            self.queue.write_buffer(
-                &self.camera_buffer,
-                0,
-                bytemuck::bytes_of(&self.camera.raw()),
-            );
+            self.camera_mut().aspect_ratio = new_size.width as f32 / new_size.height as f32;
+            self.refresh_camera();
         }
+    }
+
+    pub fn refresh_camera(&mut self) {
+        self.queue.write_buffer(
+            &self.camera_buffer,
+            0,
+            bytemuck::bytes_of(&self.camera_mut().raw()),
+        );
     }
 
     pub fn size(&self) -> PhysicalSize<u32> {
         self.size
     }
 
-    pub fn begin_frame<'renderer>(&'renderer mut self) -> FrameBuilder<'renderer> {
+    pub fn begin_frame(&mut self) -> FrameBuilder<'_> {
         FrameBuilder {
             renderer: self,
             draw_sprites: vec![],
@@ -348,7 +360,7 @@ impl Renderer {
     }
 
     pub(crate) fn reserve_instance_buffer_for(&mut self, new_instance_count: u64) {
-        if new_instance_count > self.instance_count as u64 {
+        if new_instance_count > self.instance_count {
             self.instance_count = new_instance_count;
             self.device.create_buffer(&BufferDescriptor {
                 label: None,
