@@ -373,18 +373,23 @@ impl Renderer {
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct SpriteInstance {
     position: Vector2<f32>,
+    // Angle in degress
+    rotation_deg: f32,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy, Default, Zeroable, Pod)]
 #[repr(C)]
 pub(crate) struct RawSpriteInstance {
     position: [f32; 2],
+    // Angle in radians
+    rotation_rad: f32,
 }
 
 impl SpriteInstance {
     pub(crate) fn raw(&self) -> RawSpriteInstance {
         RawSpriteInstance {
             position: self.position.into(),
+            rotation_rad: f32::to_radians(self.rotation_deg),
         }
     }
 
@@ -393,11 +398,18 @@ impl SpriteInstance {
         wgpu::VertexBufferLayout {
             array_stride: mem::size_of::<RawSpriteInstance>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Instance,
-            attributes: &[wgpu::VertexAttribute {
-                offset: 0,
-                shader_location: 2,
-                format: wgpu::VertexFormat::Float32x2,
-            }],
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 2,
+                    format: wgpu::VertexFormat::Float32x2,
+                },
+                wgpu::VertexAttribute {
+                    offset: std::mem::size_of::<[f32; 2]>() as _,
+                    shader_location: 3,
+                    format: wgpu::VertexFormat::Float32x2,
+                },
+            ],
         }
     }
 }
@@ -418,6 +430,7 @@ impl FrameBuilder<'_> {
             sprite_idx,
             SpriteInstance {
                 position: position.into(),
+                rotation_deg: 45.,
             },
         ));
         self
@@ -483,7 +496,7 @@ impl FrameBuilder<'_> {
                     let sprite_mesh_indices =
                         self.renderer.sprites[last_sprite_idx as usize].indices();
 
-                        render_pass.draw_indexed(
+                    render_pass.draw_indexed(
                         sprite_mesh_indices,
                         0,
                         0..same_sprite_len + same_sprite_len,

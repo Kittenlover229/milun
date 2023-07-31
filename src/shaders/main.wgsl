@@ -11,6 +11,7 @@ struct VertexOutput {
 
 struct InstanceInput {
     @location(2) pos: vec2<f32>,
+    @location(3) angle: f32,
 };
 
 struct Camera {
@@ -31,9 +32,17 @@ fn vs_main(
     instance: InstanceInput,
 ) -> VertexOutput {
     var out: VertexOutput;
+
+    let coss = cos(instance.angle);
+    let sinn = sqrt(1. - coss * coss);
+    let rotor = mat3x3(
+        coss, sinn, 0.,
+        -sinn, coss, 0.,
+        0., 0., 1.);
+
     out.tex_coords = model.texture_coordinates;
     out.tint = vec3<f32>(1.0, 1.0, 1.0);
-    out.clip_position = camera.view * vec4<f32>(vec3<f32>(instance.pos, 0.0) + model.position, 1.0);
+    out.clip_position = camera.view * vec4<f32>((vec3<f32>(instance.pos, 0.0) + rotor * model.position), 1.0);
     return out;
 }
 
