@@ -92,7 +92,7 @@ impl Atlas<'_> {
             indices.extend(inds);
             vertices.extend(verts);
             sprite_indices.push(i as SpriteIndex);
-            offset += buf.dimensions().1 as usize;
+            offset += buf.dimensions().0 as usize;
             x += buf.width() as f32 * x_step;
         }
 
