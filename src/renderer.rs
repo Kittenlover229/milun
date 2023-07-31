@@ -1,6 +1,4 @@
-use std::{
-    cell::{RefCell, RefMut},
-};
+use std::cell::{RefCell, RefMut};
 
 use bytemuck::{Pod, Zeroable};
 use mint::Vector2;
@@ -362,11 +360,11 @@ impl Renderer {
     pub(crate) fn reserve_instance_buffer_for(&mut self, new_instance_count: u64) {
         if new_instance_count > self.instance_count {
             self.instance_count = new_instance_count;
-            self.device.create_buffer(&BufferDescriptor {
+            self.instance_buffer = self.device.create_buffer(&BufferDescriptor {
                 label: None,
                 size: self.instance_count * std::mem::size_of::<RawSpriteInstance>() as u64,
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: true,
+                mapped_at_creation: false,
             });
         }
     }
@@ -379,12 +377,12 @@ pub struct SpriteInstance {
 
 #[derive(Debug, PartialEq, Clone, Copy, Default, Zeroable, Pod)]
 #[repr(C)]
-pub struct RawSpriteInstance {
+pub(crate) struct RawSpriteInstance {
     position: [f32; 2],
 }
 
 impl SpriteInstance {
-    pub fn raw(&self) -> RawSpriteInstance {
+    pub(crate) fn raw(&self) -> RawSpriteInstance {
         RawSpriteInstance {
             position: self.position.into(),
         }
@@ -411,7 +409,7 @@ pub struct FrameBuilder<'renderer> {
 }
 
 impl FrameBuilder<'_> {
-    pub fn draw_sprite(
+    pub fn draw_sprite_indexed(
         mut self,
         sprite_idx: SpriteIndex,
         position: impl Into<Vector2<f32>>,
@@ -432,10 +430,8 @@ impl FrameBuilder<'_> {
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
-        let (sprite_indices, instances): (Vec<_>, Vec<_>) = self.draw_sprites.into_iter().unzip();
-
         self.renderer
-            .reserve_instance_buffer_for(instances.len() as _);
+            .reserve_instance_buffer_for(self.draw_sprites.len() as _);
 
         let mut encoder =
             self.renderer
@@ -464,29 +460,56 @@ impl FrameBuilder<'_> {
             });
 
             render_pass.set_pipeline(&self.renderer.render_pipeline);
+
             render_pass.set_vertex_buffer(0, self.renderer.vertex_buffer.slice(..));
+            render_pass.set_vertex_buffer(1, self.renderer.instance_buffer.slice(..));
+
             render_pass.set_index_buffer(
                 self.renderer.index_buffer.slice(..),
                 wgpu::IndexFormat::Uint32,
             );
+
             render_pass.set_bind_group(0, &self.renderer.cold_bind_group, &[]);
             render_pass.set_bind_group(1, &self.renderer.hot_bind_group, &[]);
+
+            let mut instances = vec![];
+            let mut last_sprite_idx = 0;
+            let mut same_sprite_len = 0;
+            let mut same_sprite_sequence_begin_index = 0;
+            for (sprite_idx, sprite_instance) in self.draw_sprites {
+                if sprite_idx == last_sprite_idx {
+                    same_sprite_len += 1;
+                } else {
+                    let sprite_mesh_indices =
+                        self.renderer.sprites[last_sprite_idx as usize].indices();
+
+                        render_pass.draw_indexed(
+                        sprite_mesh_indices,
+                        0,
+                        0..same_sprite_len + same_sprite_len,
+                    );
+
+                    last_sprite_idx = sprite_idx;
+                    same_sprite_len = 1;
+                    same_sprite_sequence_begin_index = instances.len() as u32;
+                }
+
+                instances.push(sprite_instance.raw());
+            }
+
+            if !instances.is_empty() {
+                render_pass.draw_indexed(
+                    self.renderer.sprites[last_sprite_idx as usize].indices(),
+                    0,
+                    same_sprite_sequence_begin_index..instances.len() as u32,
+                );
+            };
 
             self.renderer.queue.write_buffer(
                 &self.renderer.instance_buffer,
                 0,
-                bytemuck::cast_slice(
-                    &instances
-                        .into_iter()
-                        .map(|instance| instance.raw())
-                        .collect::<Vec<_>>(),
-                ),
+                bytemuck::cast_slice(&instances),
             );
-            render_pass.set_vertex_buffer(1, self.renderer.instance_buffer.slice(..));
-
-            for sprite_idx in sprite_indices {
-                render_pass.draw_indexed(self.renderer.sprites[sprite_idx].indices(), 0, 0..1);
-            }
         }
 
         self.renderer

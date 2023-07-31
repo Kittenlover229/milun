@@ -59,7 +59,12 @@ fn main() {
             }
 
             Event::RedrawRequested(window_id) if window_id == renderer.window().id() => {
-                let result = renderer.begin_frame().draw_sprite(0, [0., 0.]).end_frame();
+                let result = renderer
+                    .begin_frame()
+                    .draw_sprite_indexed(0, [0., 0.])
+                    .draw_sprite_indexed(2, [0., 2.])
+                    .draw_sprite_indexed(2, [0., 1.])
+                    .end_frame();
 
                 match result {
                     Ok(_) => {}
