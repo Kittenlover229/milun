@@ -14,8 +14,14 @@ targets = [
 
 [advisories]
 vulnerability = "deny"
+notice = "deny"
+unsound = "deny"
 unmaintained = "warn"
 yanked = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
 
 [licenses]
 unlicensed = "deny"
