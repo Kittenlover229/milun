@@ -7,6 +7,20 @@ use crate::{vertex::Vertex, Renderer};
 
 pub type SpriteIndex = usize;
 
+#[derive(Debug, Clone, Copy, PartialEq, Hash)]
+pub struct ImageOptions {
+    // Premultiplied images are unmultiplied to avoid issues with compositing
+    premultiplied: bool,
+}
+
+impl Default for ImageOptions {
+    fn default() -> Self {
+        Self {
+            premultiplied: false
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Sprite {
     pub sprite_index_range: (u32, u32),
@@ -183,6 +197,16 @@ impl AtlasBuilder<'_> {
 
     pub fn add_image(mut self, buffer: impl Into<DynamicImage>) -> Self {
         self.rgba.push(buffer.into().to_rgba8());
+        self
+    }
+
+    pub fn add_image_advanced(
+        mut self,
+        buffer: impl Into<DynamicImage>,
+        _options: impl Into<ImageOptions>,
+    ) -> Self {
+        self.rgba.push(buffer.into().to_rgba8());
+        todo!();
         self
     }
 }
