@@ -1,5 +1,3 @@
-#![feature(array_chunks)]
-
 use wffle::Renderer;
 use winit::{
     event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
@@ -21,10 +19,10 @@ fn main() {
     let mut renderer = Renderer::from(window);
     renderer
         .atlas()
-        .add_image(texture_16x16)
-        .add_image(texture_8x8.clone())
-        .add_image(texture_8x8.clone())
-        .add_image(texture_8x16)
+        .add_sprite(texture_16x16)
+        .add_sprite(texture_8x8.clone())
+        .add_sprite(texture_8x8.clone())
+        .add_sprite(texture_8x16)
         .finalize();
 
     event_loop.run(move |event, _, control_flow| {

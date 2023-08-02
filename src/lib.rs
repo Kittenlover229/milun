@@ -1,3 +1,5 @@
+#![feature(iter_array_chunks)]
+
 mod renderer;
 mod vertex;
 mod atlas;

@@ -8,15 +8,15 @@ use crate::{vertex::Vertex, Renderer};
 pub type SpriteIndex = usize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Hash)]
-pub struct ImageOptions {
-    // Premultiplied images are unmultiplied to avoid issues with compositing
+pub struct SpriteOptions {
+    // Premultiplied images are unpremultiplied to avoid issues with compositing
     premultiplied: bool,
 }
 
-impl Default for ImageOptions {
+impl Default for SpriteOptions {
     fn default() -> Self {
         Self {
-            premultiplied: false
+            premultiplied: false,
         }
     }
 }
@@ -195,18 +195,27 @@ impl AtlasBuilder<'_> {
         todo!()
     }
 
-    pub fn add_image(mut self, buffer: impl Into<DynamicImage>) -> Self {
-        self.rgba.push(buffer.into().to_rgba8());
+    pub fn add_sprite(mut self, image: impl Into<DynamicImage>) -> Self {
+        self.rgba.push(image.into().to_rgba8());
         self
     }
 
-    pub fn add_image_advanced(
-        mut self,
-        buffer: impl Into<DynamicImage>,
-        _options: impl Into<ImageOptions>,
+    pub fn add_sprite_advanced(
+        self,
+        image: impl Into<DynamicImage>,
+        options: impl Into<SpriteOptions>,
     ) -> Self {
-        self.rgba.push(buffer.into().to_rgba8());
-        todo!();
-        self
+        let SpriteOptions { premultiplied, .. } = options.into();
+        let mut rgba32f = DynamicImage::from(image.into()).to_rgb32f();
+
+        if premultiplied {
+            for [r, g, b, a] in rgba32f.iter_mut().array_chunks::<4>() {
+                *r /= *a;
+                *g /= *a;
+                *b /= *a;
+            }
+        }
+
+        self.add_sprite(DynamicImage::from(rgba32f))
     }
 }
