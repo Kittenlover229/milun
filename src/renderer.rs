@@ -1,6 +1,7 @@
 use std::cell::{RefCell, RefMut};
 
 use bytemuck::{Pod, Zeroable};
+use cint::EncodedSrgb;
 use mint::Vector2;
 use wgpu::{util::DeviceExt, Buffer, BufferDescriptor, BufferUsages};
 use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window};
@@ -373,23 +374,31 @@ impl Renderer {
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct SpriteInstance {
     position: Vector2<f32>,
-    // Angle in degress
     rotation_deg: f32,
+    color: EncodedSrgb<u8>,
+    opacity: f32,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy, Default, Zeroable, Pod)]
 #[repr(C)]
 pub(crate) struct RawSpriteInstance {
     position: [f32; 2],
-    // Angle in radians
     rotation_rad: f32,
+    color: [f32; 4],
 }
 
 impl SpriteInstance {
     pub(crate) fn raw(&self) -> RawSpriteInstance {
+        let r = self.color.r;
+        let g = self.color.g;
+        let b = self.color.b;
+
+        let [r, g, b]: [f32; 3] = [r, g, b].map(|component| (component as f32) / 255.);
+
         RawSpriteInstance {
             position: self.position.into(),
             rotation_rad: f32::to_radians(self.rotation_deg),
+            color: [r, g, b, self.opacity].map(|component| component.clamp(0., 1.)),
         }
     }
 
@@ -407,7 +416,12 @@ impl SpriteInstance {
                 wgpu::VertexAttribute {
                     offset: std::mem::size_of::<[f32; 2]>() as _,
                     shader_location: 3,
-                    format: wgpu::VertexFormat::Float32x2,
+                    format: wgpu::VertexFormat::Float32,
+                },
+                wgpu::VertexAttribute {
+                    offset: std::mem::size_of::<[f32; 3]>() as _,
+                    shader_location: 4,
+                    format: wgpu::VertexFormat::Float32x4,
                 },
             ],
         }
@@ -425,12 +439,17 @@ impl FrameBuilder<'_> {
         mut self,
         sprite_idx: SpriteIndex,
         position: impl Into<Vector2<f32>>,
+        color: impl Into<EncodedSrgb<u8>>,
+        opacity: f32,
     ) -> Self {
         self.draw_sprites.push((
             sprite_idx,
             SpriteInstance {
                 position: position.into(),
                 rotation_deg: 45.,
+
+                color: color.into(),
+                opacity,
             },
         ));
         self
