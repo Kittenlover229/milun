@@ -4,7 +4,8 @@ use wgpu::{util::DeviceExt, Buffer, BufferDescriptor, BufferUsages};
 use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window};
 
 use crate::{
-    AtlasBuilder, Camera, CameraRaw, RawSpriteInstance, SpriteDrawData, SpriteIndex, SpriteInstance, vertex::Vertex,
+    vertex::Vertex, AtlasBuilder, Camera, CameraRaw, RawSpriteInstance, SpriteDrawData,
+    SpriteIndex, SpriteInstance,
 };
 
 /// The main object used for drawing. Use `.atlas()` to load new sprites and
@@ -317,10 +318,11 @@ impl Renderer {
     }
 
     /// Creates a temporary atlas builder that is used to insert new sprite information.
-    pub fn atlas(&mut self) -> AtlasBuilder<'_> {
+    pub fn atlas(&mut self) -> AtlasBuilder<'_, 0> {
         AtlasBuilder {
             renderer: self,
             rgba: vec![],
+            sprites: [],
         }
     }
 

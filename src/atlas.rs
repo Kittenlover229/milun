@@ -5,14 +5,16 @@ use crate::{vertex::Vertex, Renderer, SpriteDrawData, SpriteIndex, SpriteLoadOpt
 
 /// Atlas builder used for stitching sprites together.
 #[must_use]
-pub struct AtlasBuilder<'renderer> {
+pub struct AtlasBuilder<'renderer, const N: usize> {
     pub(crate) rgba: Vec<RgbaImage>,
     pub(crate) renderer: &'renderer mut Renderer,
+    pub(crate) sprites: [SpriteIndex; N],
 }
 
-impl AtlasBuilder<'_> {
+impl<'me, const N: usize> AtlasBuilder<'me, N> {
     /// Stitch the sprites without packing and upload them to the GPU.
-    pub fn finalize(self) -> Vec<SpriteIndex> {
+    #[must_use]
+    pub fn finalize(self) -> [SpriteIndex; N] {
         let mut sprite_indices = vec![];
         let mut sprites = vec![];
         let mut vertices = vec![];
@@ -161,7 +163,7 @@ impl AtlasBuilder<'_> {
         self.renderer.cold_bind_group = bind_group;
         self.renderer.sprites = sprites;
 
-        sprite_indices
+        self.sprites
     }
 
     pub fn finalize_and_repack(self) {
@@ -169,7 +171,7 @@ impl AtlasBuilder<'_> {
     }
 
     /// Add a sprite into the queue later to be stitched (and maybe packed).
-    pub fn add_sprite(self, image: impl Into<DynamicImage>) -> Self {
+    pub fn add_sprite(self, image: impl Into<DynamicImage>) -> AtlasBuilder<'me, { N + 1 }> {
         self.add_sprite_advanced(
             image,
             SpriteLoadOptions {
@@ -180,10 +182,16 @@ impl AtlasBuilder<'_> {
 
     /// Add a sprite with options not activated by default
     pub fn add_sprite_advanced(
-        mut self,
+        self,
         image: impl Into<DynamicImage>,
         options: impl Into<SpriteLoadOptions>,
-    ) -> Self {
+    ) -> AtlasBuilder<'me, { N + 1 }> {
+        let AtlasBuilder {
+            mut rgba,
+            renderer,
+            sprites,
+        } = self;
+
         let SpriteLoadOptions { premultiplied, .. } = options.into();
         let mut rgba32f = DynamicImage::from(image.into()).to_rgb32f();
 
@@ -195,7 +203,16 @@ impl AtlasBuilder<'_> {
             }
         }
 
-        self.rgba.push(DynamicImage::from(rgba32f).to_rgba8());
-        self
+        let len = renderer.sprites.len();
+        let mut sprites_iterator = sprites
+            .into_iter()
+            .chain(std::iter::once(sprites.len() + len));
+        rgba.push(DynamicImage::from(rgba32f).to_rgba8());
+
+        AtlasBuilder {
+            rgba,
+            renderer,
+            sprites: [(); N + 1].map(|_| sprites_iterator.next().unwrap()),
+        }
     }
 }

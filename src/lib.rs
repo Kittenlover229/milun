@@ -1,4 +1,5 @@
 #![feature(iter_array_chunks)]
+#![feature(generic_const_exprs)]
 
 mod atlas;
 mod camera;
