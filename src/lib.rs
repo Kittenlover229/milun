@@ -1,11 +1,15 @@
 #![feature(iter_array_chunks)]
 
-mod renderer;
-mod vertex;
 mod atlas;
 mod camera;
-pub(crate) use vertex::*;
+mod instance;
+mod renderer;
+mod sprite;
+mod vertex;
 
-pub use renderer::*;
 pub use atlas::*;
 pub use camera::*;
+pub use instance::*;
+pub use renderer::*;
+pub use sprite::*;
+

@@ -1,37 +1,9 @@
-use std::ops::Range;
-
 use image::{DynamicImage, RgbaImage};
 use wgpu::util::DeviceExt;
 
-use crate::{vertex::Vertex, Renderer};
+use crate::{vertex::Vertex, Renderer, SpriteDrawData, SpriteIndex, SpriteLoadOptions};
 
-pub type SpriteIndex = usize;
-
-#[derive(Debug, Clone, Copy, PartialEq, Hash)]
-pub struct SpriteOptions {
-    // Premultiplied images are unpremultiplied to avoid issues with compositing
-    premultiplied: bool,
-}
-
-impl Default for SpriteOptions {
-    fn default() -> Self {
-        Self {
-            premultiplied: false,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Sprite {
-    pub sprite_index_range: (u32, u32),
-}
-
-impl Sprite {
-    pub fn indices(&self) -> Range<u32> {
-        self.sprite_index_range.0..self.sprite_index_range.1
-    }
-}
-
+/// Atlas builder used for stitching sprites together.
 #[must_use]
 pub struct AtlasBuilder<'renderer> {
     pub(crate) rgba: Vec<RgbaImage>,
@@ -39,6 +11,7 @@ pub struct AtlasBuilder<'renderer> {
 }
 
 impl AtlasBuilder<'_> {
+    /// Stitch the sprites without packing and upload them to the GPU.
     pub fn finalize(self) -> Vec<SpriteIndex> {
         let mut sprite_indices = vec![];
         let mut sprites = vec![];
@@ -97,7 +70,7 @@ impl AtlasBuilder<'_> {
 
             let inds = [0, 1, 2, 1, 3, 2].map(|i| i + vertices.len() as u32);
 
-            sprites.push(Sprite {
+            sprites.push(SpriteDrawData {
                 sprite_index_range: (indices.len() as u32, (indices.len() + inds.len()) as u32),
             });
 
@@ -195,17 +168,23 @@ impl AtlasBuilder<'_> {
         todo!()
     }
 
-    pub fn add_sprite(mut self, image: impl Into<DynamicImage>) -> Self {
-        self.rgba.push(image.into().to_rgba8());
-        self
+    /// Add a sprite into the queue later to be stitched (and maybe packed).
+    pub fn add_sprite(self, image: impl Into<DynamicImage>) -> Self {
+        self.add_sprite_advanced(
+            image,
+            SpriteLoadOptions {
+                ..Default::default()
+            },
+        )
     }
 
+    /// Add a sprite with options not activated by default
     pub fn add_sprite_advanced(
-        self,
+        mut self,
         image: impl Into<DynamicImage>,
-        options: impl Into<SpriteOptions>,
+        options: impl Into<SpriteLoadOptions>,
     ) -> Self {
-        let SpriteOptions { premultiplied, .. } = options.into();
+        let SpriteLoadOptions { premultiplied, .. } = options.into();
         let mut rgba32f = DynamicImage::from(image.into()).to_rgb32f();
 
         if premultiplied {
@@ -216,6 +195,7 @@ impl AtlasBuilder<'_> {
             }
         }
 
-        self.add_sprite(DynamicImage::from(rgba32f))
+        self.rgba.push(DynamicImage::from(rgba32f).to_rgba8());
+        self
     }
 }

@@ -35,12 +35,6 @@ fn main() {
             } if window_id == window.id() => {
                 if !renderer.input(event) {
                     match event {
-                        WindowEvent::Resized(physical_size) => {
-                            renderer.resize(*physical_size);
-                        }
-                        WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                            renderer.resize(**new_inner_size);
-                        }
                         WindowEvent::CloseRequested
                         | WindowEvent::KeyboardInput {
                             input:

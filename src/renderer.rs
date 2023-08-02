@@ -1,40 +1,60 @@
-use std::cell::{RefCell, RefMut};
-
-use bytemuck::{Pod, Zeroable};
 use cint::EncodedSrgb;
 use mint::Vector2;
 use wgpu::{util::DeviceExt, Buffer, BufferDescriptor, BufferUsages};
 use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window};
 
-use crate::{AtlasBuilder, Camera, CameraRaw, Sprite, SpriteIndex, Vertex};
+use crate::{
+    AtlasBuilder, Camera, CameraRaw, RawSpriteInstance, SpriteDrawData, SpriteIndex, SpriteInstance, vertex::Vertex,
+};
 
+/// The main object used for drawing. Use `.atlas()` to load new sprites and
+/// `.begin_frame()` to draw them.
 pub struct Renderer {
+    /*** WGPU Data ***/
     pub(crate) surface: wgpu::Surface,
     pub(crate) device: wgpu::Device,
     pub(crate) queue: wgpu::Queue,
     pub(crate) config: wgpu::SurfaceConfiguration,
     pub(crate) render_pipeline: wgpu::RenderPipeline,
 
+    /*** Window Data ***/
+    /// Actual size of the window in pixels (?)
     pub(crate) size: PhysicalSize<u32>,
+    /// Window everything is presented onto
     pub(crate) window: Window,
 
+    /*** Atlas ***/
+    /// A stitched texture generate by the AtlasBuilder
     pub(crate) atlas_texture: (wgpu::Texture, wgpu::TextureView),
+    /// The layout of the atlas bind group
     pub(crate) atlas_bind_group_layout: wgpu::BindGroupLayout,
+    /// Sampler used by the atlas
     pub(crate) atlas_sampler: wgpu::Sampler,
 
-    pub(crate) camera: RefCell<Camera>,
+    /*** Camera ***/
+    /// The camera from the perspective of which everything is rendered
+    pub(crate) camera: Camera,
+    /// Camera's reflection on the GPU
     pub(crate) camera_buffer: wgpu::Buffer,
 
-    // Bind Group for data that rarely changes
+    /*** Bind Groups ***/
+    /// Bind Group for data that rarely changes
     pub(crate) cold_bind_group: wgpu::BindGroup,
-    // Bind Group for data that changes often
+    /// Bind Group for data that changes often
     pub(crate) hot_bind_group: wgpu::BindGroup,
 
+    /*** Instances ***/
+    /// The amount of instances the `instance_buffer` can take
     pub(crate) instance_count: u64,
+    /// The buffer that all data is in
     pub(crate) instance_buffer: Buffer,
 
-    pub(crate) sprites: Vec<Sprite>,
+    /*** Sprites ***/
+    /// The indices into the index buffer for each sprite
+    pub(crate) sprites: Vec<SpriteDrawData>,
+    /// Vertices of the sprite's mesh
     pub(crate) vertex_buffer: Buffer,
+    /// Indices into the vertex buffer
     pub(crate) index_buffer: Buffer,
 }
 
@@ -45,6 +65,7 @@ impl From<Window> for Renderer {
 }
 
 impl Renderer {
+    /// Creates all the required objects on the GPU to draw onto the Window
     async fn new(window: Window) -> Self {
         let size = window.inner_size();
 
@@ -279,20 +300,84 @@ impl Renderer {
 }
 
 impl Renderer {
+    /// Handle window inputs that influence the renderer, returns `true` if
+    /// the input was handled and `false` otherwise.
     pub fn input(&mut self, event: &WindowEvent) -> bool {
         match event {
             WindowEvent::Resized(physical_size) => {
                 self.resize(*physical_size);
-                false
+                true
             }
             WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
                 self.resize(**new_inner_size);
-                false
+                true
             }
             _ => false,
         }
     }
 
+    /// Creates a temporary atlas builder that is used to insert new sprite information.
+    pub fn atlas(&mut self) -> AtlasBuilder<'_> {
+        AtlasBuilder {
+            renderer: self,
+            rgba: vec![],
+        }
+    }
+
+    fn sampling_options() -> wgpu::SamplerDescriptor<'static> {
+        wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        }
+    }
+
+    /// Changes the size of the output surface and refreshes the camera.
+    pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
+        if new_size.width > 0 && new_size.height > 0 {
+            self.size = new_size;
+            self.config.width = new_size.width;
+            self.config.height = new_size.height;
+            self.surface.configure(&self.device, &self.config);
+            self.mutate_camera(|camera| {
+                camera.aspect_ratio = new_size.width as f32 / new_size.height as f32
+            });
+        }
+    }
+
+    /// Start the rendering process by creating a frame buffer.
+    pub fn begin_frame(&mut self) -> FrameBuilder<'_> {
+        FrameBuilder::from(self)
+    }
+
+    /// Change the camera data and automatically refresh the buffer
+    pub fn mutate_camera(&mut self, camera: impl FnOnce(&mut Camera)) {
+        camera(&mut self.camera);
+        self.queue.write_buffer(
+            &self.camera_buffer,
+            0,
+            bytemuck::bytes_of(&self.camera.raw()),
+        );
+    }
+
+    pub(crate) fn reserve_instance_buffer_for(&mut self, new_instance_count: u64) {
+        if new_instance_count > self.instance_count {
+            self.instance_count = self.instance_count.max(new_instance_count);
+            self.instance_buffer = self.device.create_buffer(&BufferDescriptor {
+                label: None,
+                size: self.instance_count * std::mem::size_of::<RawSpriteInstance>() as u64,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+        }
+    }
+}
+
+impl Renderer {
     pub fn device(&self) -> &wgpu::Device {
         &self.device
     }
@@ -305,136 +390,36 @@ impl Renderer {
         &self.window
     }
 
-    pub fn camera_mut(&self) -> RefMut<'_, Camera> {
-        self.camera.borrow_mut()
-    }
-
-    pub fn atlas(&mut self) -> AtlasBuilder<'_> {
-        AtlasBuilder {
-            renderer: self,
-            rgba: vec![],
-        }
-    }
-
-    pub fn sampling_options() -> wgpu::SamplerDescriptor<'static> {
-        wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Nearest,
-            ..Default::default()
-        }
-    }
-
-    pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
-        if new_size.width > 0 && new_size.height > 0 {
-            self.size = new_size;
-            self.config.width = new_size.width;
-            self.config.height = new_size.height;
-            self.surface.configure(&self.device, &self.config);
-            self.camera_mut().aspect_ratio = new_size.width as f32 / new_size.height as f32;
-            self.refresh_camera();
-        }
-    }
-
-    pub fn refresh_camera(&mut self) {
-        self.queue.write_buffer(
-            &self.camera_buffer,
-            0,
-            bytemuck::bytes_of(&self.camera_mut().raw()),
-        );
-    }
-
     pub fn size(&self) -> PhysicalSize<u32> {
         self.size
     }
-
-    pub fn begin_frame(&mut self) -> FrameBuilder<'_> {
-        FrameBuilder {
-            renderer: self,
-            draw_sprites: vec![],
-        }
-    }
-
-    pub(crate) fn reserve_instance_buffer_for(&mut self, new_instance_count: u64) {
-        if new_instance_count > self.instance_count {
-            self.instance_count = new_instance_count;
-            self.instance_buffer = self.device.create_buffer(&BufferDescriptor {
-                label: None,
-                size: self.instance_count * std::mem::size_of::<RawSpriteInstance>() as u64,
-                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            });
-        }
-    }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub struct SpriteInstance {
-    position: Vector2<f32>,
-    rotation_deg: f32,
-    color: EncodedSrgb<u8>,
-    opacity: f32,
-}
-
-#[derive(Debug, PartialEq, Clone, Copy, Default, Zeroable, Pod)]
-#[repr(C)]
-pub(crate) struct RawSpriteInstance {
-    position: [f32; 2],
-    rotation_rad: f32,
-    color: [f32; 4],
-}
-
-impl SpriteInstance {
-    pub(crate) fn raw(&self) -> RawSpriteInstance {
-        let r = self.color.r;
-        let g = self.color.g;
-        let b = self.color.b;
-
-        let [r, g, b]: [f32; 3] = [r, g, b].map(|component| (component as f32) / 255.);
-
-        RawSpriteInstance {
-            position: self.position.into(),
-            rotation_rad: f32::to_radians(self.rotation_deg),
-            color: [r, g, b, self.opacity].map(|component| component.clamp(0., 1.)),
-        }
-    }
-
-    pub fn layout() -> wgpu::VertexBufferLayout<'static> {
-        use std::mem;
-        wgpu::VertexBufferLayout {
-            array_stride: mem::size_of::<RawSpriteInstance>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Instance,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    shader_location: 2,
-                    format: wgpu::VertexFormat::Float32x2,
-                },
-                wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 2]>() as _,
-                    shader_location: 3,
-                    format: wgpu::VertexFormat::Float32,
-                },
-                wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 3]>() as _,
-                    shader_location: 4,
-                    format: wgpu::VertexFormat::Float32x4,
-                },
-            ],
-        }
-    }
-}
-
+/// Used for adding draw data to a frame of a [`Renderer`].
 #[must_use]
 pub struct FrameBuilder<'renderer> {
     renderer: &'renderer mut Renderer,
     draw_sprites: Vec<(SpriteIndex, SpriteInstance)>,
 }
 
+impl<'renderer> From<&'renderer mut Renderer> for FrameBuilder<'renderer> {
+    fn from(renderer: &'renderer mut Renderer) -> Self {
+        FrameBuilder {
+            renderer,
+            draw_sprites: vec![],
+        }
+    }
+}
+
 impl FrameBuilder<'_> {
+    /// Draws the sprite at index `sprite_index` in the Renderer's sprite list.
+    ///
+    /// The sprite is displayed at `position`, tinted with colour `color` and
+    /// opacity `opacity`.
+    ///
+    /// All the sprites are considered non-premultiplied by default.
+    /// If the sprite you are drawing is premultiplied, specify that option in
+    /// the [`AtlasBuilder`] using the [`SpriteLoadOptions`].
     pub fn draw_sprite_indexed(
         mut self,
         sprite_idx: SpriteIndex,
@@ -455,6 +440,7 @@ impl FrameBuilder<'_> {
         self
     }
 
+    /// Finishes the frame and presents it onto the [`Renderer`]'s surface.
     pub fn end_frame(self) -> Result<(), wgpu::SurfaceError> {
         let output = self.renderer.surface.get_current_texture()?;
 
@@ -547,6 +533,7 @@ impl FrameBuilder<'_> {
         self.renderer
             .queue
             .submit(std::iter::once(encoder.finish()));
+
         output.present();
 
         Ok(())
