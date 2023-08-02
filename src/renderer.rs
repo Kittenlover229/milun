@@ -501,7 +501,7 @@ impl FrameBuilder<'_> {
                     same_sprite_len += 1;
                 } else {
                     let sprite_mesh_indices =
-                        self.renderer.sprites[last_sprite_idx as usize].indices();
+                        self.renderer.sprites[last_sprite_idx].indices();
 
                     render_pass.draw_indexed(
                         sprite_mesh_indices,
@@ -519,7 +519,7 @@ impl FrameBuilder<'_> {
 
             if !instances.is_empty() {
                 render_pass.draw_indexed(
-                    self.renderer.sprites[last_sprite_idx as usize].indices(),
+                    self.renderer.sprites[last_sprite_idx].indices(),
                     0,
                     same_sprite_sequence_begin_index..instances.len() as u32,
                 );

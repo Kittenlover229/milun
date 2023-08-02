@@ -25,9 +25,9 @@ pub(crate) struct RawSpriteInstance {
     pub(crate) color: [f32; 4],
 }
 
-impl Into<RawSpriteInstance> for SpriteInstance {
-    fn into(self) -> RawSpriteInstance {
-        self.raw()
+impl From<SpriteInstance> for RawSpriteInstance {
+    fn from(val: SpriteInstance) -> Self {
+        val.raw()
     }
 }
 

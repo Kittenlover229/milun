@@ -1,3 +1,4 @@
+#![allow(incomplete_features)]
 #![feature(iter_array_chunks)]
 #![feature(generic_const_exprs)]
 
@@ -13,4 +14,3 @@ pub use camera::*;
 pub use instance::*;
 pub use renderer::*;
 pub use sprite::*;
-

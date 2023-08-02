@@ -3,19 +3,11 @@ use std::ops::Range;
 pub type SpriteIndex = usize;
 
 /// Options of the sprite when it's loaded into the sprite atlas and stitched.
-#[derive(Debug, Clone, Copy, PartialEq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Default)]
 pub struct SpriteLoadOptions {
     /// Premultiplied images are unpremultiplied before storage.
     /// This flag specifies if it should be done to a sprite.
     pub premultiplied: bool,
-}
-
-impl Default for SpriteLoadOptions {
-    fn default() -> Self {
-        Self {
-            premultiplied: false,
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

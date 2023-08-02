@@ -193,7 +193,7 @@ impl<'me, const N: usize> AtlasBuilder<'me, N> {
         } = self;
 
         let SpriteLoadOptions { premultiplied, .. } = options.into();
-        let mut rgba32f = DynamicImage::from(image.into()).to_rgb32f();
+        let mut rgba32f = image.into().to_rgb32f();
 
         if premultiplied {
             for [r, g, b, a] in rgba32f.iter_mut().array_chunks::<4>() {
