@@ -460,6 +460,8 @@ impl FrameBuilder<'_> {
                     label: Some("Render Encoder"),
                 });
 
+        let (sprite_indices, instances): (Vec<_>, Vec<_>) = self.draw_sprites.into_iter().unzip();
+
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
@@ -492,43 +494,18 @@ impl FrameBuilder<'_> {
             render_pass.set_bind_group(0, &self.renderer.cold_bind_group, &[]);
             render_pass.set_bind_group(1, &self.renderer.hot_bind_group, &[]);
 
-            let mut instances = vec![];
-            let mut last_sprite_idx = 0;
-            let mut same_sprite_len = 0;
-            let mut same_sprite_sequence_begin_index = 0;
-            for (sprite_idx, sprite_instance) in self.draw_sprites {
-                if sprite_idx == last_sprite_idx {
-                    same_sprite_len += 1;
-                } else {
-                    let sprite_mesh_indices =
-                        self.renderer.sprites[last_sprite_idx].indices();
-
-                    render_pass.draw_indexed(
-                        sprite_mesh_indices,
-                        0,
-                        0..same_sprite_len + same_sprite_len,
-                    );
-
-                    last_sprite_idx = sprite_idx;
-                    same_sprite_len = 1;
-                    same_sprite_sequence_begin_index = instances.len() as u32;
-                }
-
-                instances.push(sprite_instance.raw());
-            }
-
-            if !instances.is_empty() {
+            for (i, sprite_idx) in sprite_indices.into_iter().enumerate() {
                 render_pass.draw_indexed(
-                    self.renderer.sprites[last_sprite_idx].indices(),
+                    self.renderer.sprites[sprite_idx].indices(),
                     0,
-                    same_sprite_sequence_begin_index..instances.len() as u32,
+                    i as _..(i + 1) as _,
                 );
-            };
+            }
 
             self.renderer.queue.write_buffer(
                 &self.renderer.instance_buffer,
                 0,
-                bytemuck::cast_slice(&instances),
+                bytemuck::cast_slice(&instances.into_iter().map(|i| i.raw()).collect::<Vec<_>>()),
             );
         }
 

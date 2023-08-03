@@ -7,6 +7,7 @@
 
 mod atlas;
 mod camera;
+mod packing;
 mod instance;
 mod renderer;
 mod sprite;
