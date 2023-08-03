@@ -22,7 +22,7 @@ fn main() {
         .add_sprite(texture_16x16)
         .add_sprite(texture_8x16)
         .add_sprite(texture_8x8)
-        .finalize();
+        .finalize_and_repack();
 
     event_loop.run(move |event, _, control_flow| {
         let window = renderer.window();

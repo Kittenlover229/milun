@@ -1,4 +1,7 @@
+use std::cell::RefCell;
+
 use image::{DynamicImage, RgbaImage};
+use mint::Vector2;
 use wgpu::util::DeviceExt;
 
 use crate::{vertex::Vertex, Renderer, SpriteDrawData, SpriteIndex, SpriteLoadOptions};
@@ -166,8 +169,152 @@ impl<'me, const N: usize> AtlasBuilder<'me, N> {
         self.sprites
     }
 
-    pub fn finalize_and_repack(self) {
-        todo!()
+    #[must_use]
+    pub fn finalize_and_repack(mut self) -> [SpriteIndex; 3] {
+        #[derive(Debug)]
+        struct Node {
+            children: Option<(Box<RefCell<Node>>, Box<RefCell<Node>>)>,
+            topleft: Vector2<u32>,
+            botright: Vector2<u32>,
+            image_index: Option<usize>,
+        }
+
+        self.rgba.sort_by(|lhs, rhs| {
+            match lhs.width().cmp(&rhs.width()) {
+                std::cmp::Ordering::Equal => lhs.height().cmp(&rhs.height()),
+                x => x,
+            }
+            .reverse()
+        });
+
+        impl Node {
+            // Returns a new Some(Some(node)) if a new node should be created, a None if no node
+            // can be created, or Some(None) if the node fit inside itself
+            pub fn insert(&mut self, image: &RgbaImage, index: usize) -> bool {
+                match &self.children {
+                    Some((left, right)) => {
+                        if left.borrow_mut().insert(image, index) {
+                            true
+                        } else {
+                            right.borrow_mut().insert(image, index)
+                        }
+                    }
+
+                    None => {
+                        if self.image_index != None {
+                            return false;
+                        }
+
+                        let img_size: Vector2<u32> = [image.width(), image.height()].into();
+
+                        if self.botright.x < img_size.x || self.botright.y < img_size.y {
+                            return false;
+                        }
+
+                        if img_size == self.botright {
+                            self.image_index = Some(index);
+                            return true;
+                        }
+
+                        let dx = (self.botright.x - self.topleft.x) - img_size.x;
+                        let dy = (self.botright.y - self.topleft.y) - img_size.y;
+
+                        let children = if dx > dy {
+                            [
+                                Node {
+                                    children: None,
+                                    topleft: self.topleft,
+                                    botright: [self.topleft.x + img_size.x - 1, self.botright.y]
+                                        .into(),
+                                    image_index: Some(index),
+                                },
+                                Node {
+                                    children: None,
+                                    topleft: [self.topleft.x + img_size.x, self.topleft.y].into(),
+                                    botright: self.botright,
+                                    image_index: None,
+                                },
+                            ]
+                        } else {
+                            [
+                                Node {
+                                    children: None,
+                                    topleft: self.topleft,
+                                    botright: [self.botright.x, self.topleft.y + img_size.y - 1]
+                                        .into(),
+                                    image_index: Some(index),
+                                },
+                                Node {
+                                    children: None,
+                                    topleft: [self.topleft.x, self.topleft.y + img_size.y].into(),
+                                    botright: self.botright,
+                                    image_index: None,
+                                },
+                            ]
+                        };
+
+                        let [a, b] = children;
+                        self.children =
+                            Some((Box::new(RefCell::new(a)), Box::new(RefCell::new(b))));
+                        true
+                    }
+                }
+            }
+        }
+
+        let mut root = Node {
+            children: None,
+            topleft: [0; 2].into(),
+            botright: [u32::MAX; 2].into(),
+            image_index: None,
+        };
+
+        for (i, image) in self.rgba.iter().enumerate() {
+            root.insert(image, i);
+        }
+
+        let mut node_queue = vec![root];
+        let mut sprites_to_put = vec![];
+        while let Some(node) = node_queue.pop() {
+            let Node {
+                children,
+                topleft,
+                image_index,
+                ..
+            } = node;
+
+            if let Some((left, right)) = children {
+                node_queue.push(left.into_inner());
+                node_queue.push(right.into_inner());
+            }
+
+            if let Some(idx) = image_index {
+                sprites_to_put.push((topleft, idx))
+            }
+        }
+
+        let buffer_size: Vector2<u32> = sprites_to_put
+            .iter()
+            .map(|(pos, idx)| {
+                let z = &self.rgba[*idx];
+                [pos.x + z.width(), pos.y + z.height()]
+            })
+            .reduce(|[x1, y1], [x2, y2]| [x1.max(x2), y1.max(y2)])
+            .unwrap()
+            .into();
+
+        let mut buffer = RgbaImage::new(buffer_size.x, buffer_size.y);
+        for (pos, idx) in sprites_to_put.iter() {
+            let sprite = &mut self.rgba[*idx];
+            for (row, new_row) in buffer.rows_mut().skip(pos.y as _).zip(sprite.rows_mut()) {
+                for (pixel, new_color) in row.skip(pos.x as _).zip(new_row) {
+                    *pixel = *new_color;
+                }
+            }
+        }
+
+        buffer.save("E.png").unwrap();
+        [0, 0, 0]
     }
 
     /// Add a sprite into the queue later to be stitched (and maybe packed).

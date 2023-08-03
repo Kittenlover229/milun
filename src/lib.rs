@@ -1,6 +1,9 @@
 #![allow(incomplete_features)]
 #![feature(iter_array_chunks)]
+#![feature(generators)]
+#![feature(generator_trait)]
 #![feature(generic_const_exprs)]
+#![feature(iter_from_generator)]
 
 mod atlas;
 mod camera;
