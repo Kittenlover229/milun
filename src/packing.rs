@@ -5,7 +5,7 @@ use mint::Vector2;
 
 #[derive(Debug)]
 pub(crate) struct Node {
-    pub(crate) children: Option<(Box<RefCell<Node>>, Box<RefCell<Node>>)>,
+    pub(crate) children: Option<[Box<RefCell<Node>>; 2]>,
     pub(crate) topleft: Vector2<u32>,
     pub(crate) botright: Vector2<u32>,
     pub(crate) image_index: Option<usize>,
@@ -14,7 +14,7 @@ pub(crate) struct Node {
 impl Node {
     pub fn insert(&mut self, image: &RgbaImage, index: usize) -> bool {
         match &self.children {
-            Some((left, right)) => {
+            Some([left, right]) => {
                 if left.borrow_mut().insert(image, index) {
                     true
                 } else {
@@ -73,8 +73,7 @@ impl Node {
                     ]
                 };
 
-                let [a, b] = children;
-                self.children = Some((Box::new(RefCell::new(a)), Box::new(RefCell::new(b))));
+                self.children = Some(children.map(|a| Box::new(RefCell::new(a))));
                 true
             }
         }

@@ -6,14 +6,17 @@ resolver = "2"
 
 [dependencies]
 bytemuck = { version = "1.13", features = [ "derive" ] }
+egui-wgpu = { version = "^0.22", features = ["winit"] }
 cint = "0.3.1"
 hashbrown = "0.14"
 mint = "0.5.9"
 pollster = "0.3"
 winit = "0.28"
+egui-winit = "^0.22"
+egui = { version = "^0.22", features = [ "cint", "mint", "extra_debug_asserts" ] }
 
 [dependencies.wgpu]
-version = "0.17"
+version = "^0.16"
 features = ["trace", "webgl"]
 
 [dependencies.image]

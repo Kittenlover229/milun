@@ -45,7 +45,7 @@ impl<'me, const N: usize> AtlasBuilder<'me, N> {
                 ..
             } = node;
 
-            if let Some((left, right)) = children {
+            if let Some([left, right]) = children {
                 node_queue.push(left.into_inner());
                 node_queue.push(right.into_inner());
             }

@@ -1,11 +1,12 @@
 use cint::EncodedSrgb;
+use egui::Context;
 use mint::Vector2;
 use wgpu::{util::DeviceExt, Buffer, BufferDescriptor, BufferUsages};
 use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window};
 
 use crate::{
-    vertex::Vertex, AtlasBuilder, Camera, CameraRaw, RawSpriteInstance, SpriteDrawData,
-    SpriteIndex, SpriteInstance,
+    vertex::Vertex, AtlasBuilder, Camera, CameraRaw, EguiIntegration, RawSpriteInstance,
+    SpriteDrawData, SpriteIndex, SpriteInstance,
 };
 
 /// The main object used for drawing. Use `.atlas()` to load new sprites and
@@ -57,6 +58,9 @@ pub struct Renderer {
     pub(crate) vertex_buffer: Buffer,
     /// Indices into the vertex buffer
     pub(crate) index_buffer: Buffer,
+
+    /*** EGUI Integration ***/
+    pub(crate) egui_integration: EguiIntegration,
 }
 
 impl From<Window> for Renderer {
@@ -279,6 +283,8 @@ impl Renderer {
             hot_bind_group,
             atlas_bind_group_layout: cold_bind_group_layout,
 
+            egui_integration: { EguiIntegration::new(&window, &device, surface_format) },
+
             camera: Default::default(),
             camera_buffer,
 
@@ -302,8 +308,12 @@ impl Renderer {
 
 impl Renderer {
     /// Handle window inputs that influence the renderer, returns `true` if
-    /// the input was handled and `false` otherwise.
+    /// the input was consumed and `false` otherwise.
     pub fn input(&mut self, event: &WindowEvent) -> bool {
+        if self.egui_integration.input(&event) {
+            return true;
+        }
+
         match event {
             WindowEvent::Resized(physical_size) => {
                 self.resize(*physical_size);
@@ -406,6 +416,7 @@ pub struct FrameBuilder<'renderer> {
 
 impl<'renderer> From<&'renderer mut Renderer> for FrameBuilder<'renderer> {
     fn from(renderer: &'renderer mut Renderer) -> Self {
+        renderer.egui_integration.begin_frame(&renderer.window);
         FrameBuilder {
             renderer,
             draw_sprites: vec![],
@@ -442,6 +453,11 @@ impl FrameBuilder<'_> {
         self
     }
 
+    pub fn draw_egui(self, show: impl FnOnce(&Context)) -> Self {
+        show(&self.renderer.egui_integration.egui_context);
+        self
+    }
+
     /// Finishes the frame and presents it onto the [`Renderer`]'s surface.
     pub fn end_frame(self) -> Result<(), wgpu::SurfaceError> {
         let output = self.renderer.surface.get_current_texture()?;
@@ -459,6 +475,22 @@ impl FrameBuilder<'_> {
                 .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                     label: Some("Render Encoder"),
                 });
+
+        let Renderer {
+            queue,
+            render_pipeline,
+            vertex_buffer,
+            instance_buffer,
+            index_buffer,
+            sprites,
+            cold_bind_group,
+            hot_bind_group,
+            window,
+            device,
+            config,
+            egui_integration,
+            ..
+        } = self.renderer;
 
         let (sprite_indices, instances): (Vec<_>, Vec<_>) = self.draw_sprites.into_iter().unzip();
 
@@ -481,37 +513,30 @@ impl FrameBuilder<'_> {
                 depth_stencil_attachment: None,
             });
 
-            render_pass.set_pipeline(&self.renderer.render_pipeline);
+            render_pass.set_pipeline(&render_pipeline);
 
-            render_pass.set_vertex_buffer(0, self.renderer.vertex_buffer.slice(..));
-            render_pass.set_vertex_buffer(1, self.renderer.instance_buffer.slice(..));
+            render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+            render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
 
-            render_pass.set_index_buffer(
-                self.renderer.index_buffer.slice(..),
-                wgpu::IndexFormat::Uint32,
-            );
+            render_pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);
 
-            render_pass.set_bind_group(0, &self.renderer.cold_bind_group, &[]);
-            render_pass.set_bind_group(1, &self.renderer.hot_bind_group, &[]);
+            render_pass.set_bind_group(0, cold_bind_group, &[]);
+            render_pass.set_bind_group(1, hot_bind_group, &[]);
 
             for (i, sprite_idx) in sprite_indices.into_iter().enumerate() {
-                render_pass.draw_indexed(
-                    self.renderer.sprites[sprite_idx].indices(),
-                    0,
-                    i as _..(i + 1) as _,
-                );
+                render_pass.draw_indexed(sprites[sprite_idx].indices(), 0, i as _..(i + 1) as _);
             }
 
-            self.renderer.queue.write_buffer(
-                &self.renderer.instance_buffer,
+            queue.write_buffer(
+                &instance_buffer,
                 0,
                 bytemuck::cast_slice(&instances.into_iter().map(|i| i.raw()).collect::<Vec<_>>()),
             );
         }
 
-        self.renderer
-            .queue
-            .submit(std::iter::once(encoder.finish()));
+        egui_integration.end_frame(window, device, queue, config, &view, &mut encoder);
+
+        queue.submit(std::iter::once(encoder.finish()));
 
         output.present();
 

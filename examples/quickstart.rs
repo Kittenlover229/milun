@@ -55,6 +55,11 @@ fn main() {
                     .draw_sprite_indexed(i8x8, [0., 0.], [0x00, 0xFF, 0xFF], 1.0)
                     .draw_sprite_indexed(i16x16, [0., 1.], [0xFF, 0xFF, 0x00], 1.0)
                     .draw_sprite_indexed(i8x16, [0., 2.], [0xFF, 0x00, 0xFF], 0.5)
+                    .draw_egui(|ctx| {
+                        egui::Window::new("Demo Egui Window").show(ctx, |ui| {
+                            ui.label("Hello, world!");
+                        });
+                    })
                     .end_frame();
 
                 match result {

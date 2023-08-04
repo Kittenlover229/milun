@@ -12,9 +12,11 @@ mod instance;
 mod renderer;
 mod sprite;
 mod vertex;
+mod egui;
 
 pub use atlas::*;
 pub use camera::*;
 pub use instance::*;
 pub use renderer::*;
 pub use sprite::*;
+pub use crate::egui::*;
