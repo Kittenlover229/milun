@@ -5,7 +5,7 @@ use wgpu::{util::DeviceExt, Buffer, BufferDescriptor, BufferUsages};
 use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window};
 
 use crate::{
-    vertex::Vertex, AtlasBuilder, Camera, CameraRaw, EguiIntegration, RawSpriteInstance,
+    egui::EguiIntegration, vertex::Vertex, AtlasBuilder, Camera, CameraRaw, RawSpriteInstance,
     SpriteDrawData, SpriteIndex, SpriteInstance,
 };
 
@@ -310,7 +310,7 @@ impl Renderer {
     /// Handle window inputs that influence the renderer, returns `true` if
     /// the input was consumed and `false` otherwise.
     pub fn input(&mut self, event: &WindowEvent) -> bool {
-        if self.egui_integration.input(&event) {
+        if self.egui_integration.input(event) {
             return true;
         }
 
@@ -454,7 +454,7 @@ impl FrameBuilder<'_> {
     }
 
     pub fn draw_egui(self, show: impl FnOnce(&Context)) -> Self {
-        show(&self.renderer.egui_integration.egui_context);
+        show(&self.renderer.egui_integration.context);
         self
     }
 
@@ -513,7 +513,7 @@ impl FrameBuilder<'_> {
                 depth_stencil_attachment: None,
             });
 
-            render_pass.set_pipeline(&render_pipeline);
+            render_pass.set_pipeline(render_pipeline);
 
             render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
             render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
@@ -528,7 +528,7 @@ impl FrameBuilder<'_> {
             }
 
             queue.write_buffer(
-                &instance_buffer,
+                instance_buffer,
                 0,
                 bytemuck::cast_slice(&instances.into_iter().map(|i| i.raw()).collect::<Vec<_>>()),
             );
