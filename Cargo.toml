@@ -11,7 +11,7 @@ cint = "0.3.1"
 hashbrown = "0.14"
 mint = "0.5.9"
 pollster = "0.3"
-winit = "0.28"
+winit = { version = "0.28", features = [ "mint" ] }
 egui-winit = "^0.22"
 egui = { version = "^0.22", features = [ "cint", "mint", "extra_debug_asserts" ] }
 

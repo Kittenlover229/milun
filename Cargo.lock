@@ -2168,6 +2168,7 @@ dependencies = [
  "instant",
  "libc",
  "log",
+ "mint",
  "mio",
  "ndk",
  "objc2",

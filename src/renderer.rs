@@ -376,6 +376,18 @@ impl Renderer {
         );
     }
 
+    pub fn window_to_world(&self, window_position: impl Into<Vector2<u32>>) -> Vector2<f32> {
+        let [x, y] = <[u32; 2]>::from(window_position.into()).map(|v| v as f32);
+        let [x, y] = [
+            (x / self.window.inner_size().width as f32 * 2. - 1.)
+                * self.camera.size as f32
+                * self.camera.aspect_ratio,
+            (-y / self.window.inner_size().height as f32 * 2. + 1.) * self.camera.size as f32,
+        ];
+
+        [x, y].into()
+    }
+
     pub(crate) fn reserve_instance_buffer_for(&mut self, new_instance_count: u64) {
         if new_instance_count > self.instance_count {
             self.instance_count = self.instance_count.max(new_instance_count);
