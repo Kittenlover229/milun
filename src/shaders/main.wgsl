@@ -11,8 +11,9 @@ struct VertexOutput {
 
 struct InstanceInput {
     @location(2) pos: vec2<f32>,
-    @location(3) angle: f32,
-    @location(4) color: vec4<f32>
+    @location(3) scale: vec2<f32>,
+    @location(4) angle: f32,
+    @location(5) color: vec4<f32>
 };
 
 struct Camera {
@@ -44,7 +45,7 @@ fn vs_main(
 
     out.tex_coords = model.texture_coordinates;
     out.tint = instance.color;
-    out.clip_position = camera.view * vec4<f32>((vec3<f32>(instance.pos, 0.0) + rotor * model.position), 1.0);
+    out.clip_position = camera.view * vec4<f32>((vec3<f32>(instance.pos, 0.0) + rotor * model.position * vec3<f32>(instance.scale, 0.0)), 1.0);
     return out;
 }
 

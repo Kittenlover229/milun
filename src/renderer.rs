@@ -6,7 +6,7 @@ use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window};
 
 use crate::{
     egui::EguiIntegration, vertex::Vertex, AtlasBuilder, Camera, CameraRaw, RawSpriteInstance,
-    SpriteDrawData, SpriteIndex, SpriteInstance,
+    SpriteDrawData, SpriteIndex, SpriteInstance, SpriteTransform,
 };
 
 /// The main object used for drawing. Use `.atlas()` to load new sprites and
@@ -380,9 +380,9 @@ impl Renderer {
         let [x, y] = <[u32; 2]>::from(window_position.into()).map(|v| v as f32);
         let [x, y] = [
             (x / self.window.inner_size().width as f32 * 2. - 1.)
-                * self.camera.size as f32
+                * self.camera.size
                 * self.camera.aspect_ratio,
-            (-y / self.window.inner_size().height as f32 * 2. + 1.) * self.camera.size as f32,
+            (-y / self.window.inner_size().height as f32 * 2. + 1.) * self.camera.size,
         ];
 
         [x, y].into()
@@ -449,6 +449,7 @@ impl FrameBuilder<'_> {
         mut self,
         sprite_idx: SpriteIndex,
         position: impl Into<Vector2<f32>>,
+        transform: impl Into<SpriteTransform>,
         color: impl Into<EncodedSrgb<u8>>,
         opacity: f32,
     ) -> Self {
@@ -456,8 +457,7 @@ impl FrameBuilder<'_> {
             sprite_idx,
             SpriteInstance {
                 position: position.into(),
-                rotation_deg: 45.,
-
+                transform: transform.into(),
                 color: color.into(),
                 opacity,
             },

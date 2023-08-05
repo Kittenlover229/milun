@@ -1,4 +1,4 @@
-use wffle::Renderer;
+use wffle::{Renderer, SpriteTransform};
 use winit::{
     event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -46,7 +46,7 @@ fn main() {
                             ..
                         } => *control_flow = ControlFlow::Exit,
                         WindowEvent::CursorMoved { position, .. } => {
-                            cursor_pos = [position.x as u32, position.y as u32].into();
+                            cursor_pos = [position.x as u32, position.y as u32];
                         }
                         _ => {}
                     }
@@ -57,10 +57,34 @@ fn main() {
                 let cursor_pos = renderer.window_to_world(cursor_pos);
                 let result = renderer
                     .begin_frame()
-                    .draw_sprite_indexed(i8x8, [0., 0.], [0x00, 0xFF, 0xFF], 1.0)
-                    .draw_sprite_indexed(i8x8, cursor_pos, [0xFF, 0xFF, 0xFF], 1.0)
-                    .draw_sprite_indexed(i16x16, [0., 1.], [0xFF, 0xFF, 0x00], 1.0)
-                    .draw_sprite_indexed(i8x16, [0., 2.], [0xFF, 0x00, 0xFF], 0.5)
+                    .draw_sprite_indexed(
+                        i8x8,
+                        [0., 0.],
+                        SpriteTransform::default(),
+                        [0x00, 0xFF, 0xFF],
+                        1.0,
+                    )
+                    .draw_sprite_indexed(
+                        i8x8,
+                        cursor_pos,
+                        SpriteTransform::scaled([1., 2.]),
+                        [0xFF, 0xFF, 0xFF],
+                        1.0,
+                    )
+                    .draw_sprite_indexed(
+                        i16x16,
+                        [0., 1.],
+                        SpriteTransform::default(),
+                        [0xFF, 0xFF, 0x00],
+                        1.0,
+                    )
+                    .draw_sprite_indexed(
+                        i8x16,
+                        [0., 2.],
+                        SpriteTransform::default(),
+                        [0xFF, 0x00, 0xFF],
+                        0.5,
+                    )
                     .draw_egui(|ctx| {
                         egui::Window::new("Demo Egui Window").show(ctx, |ui| {
                             ui.label("Hello, world!");
