@@ -160,7 +160,7 @@ impl<'me, const N: usize> AtlasBuilder<'me, N> {
             self.renderer
                 .device()
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Atlas Index Buffer"),
+                    label: None,
                     contents: bytemuck::cast_slice(&indices),
                     usage: wgpu::BufferUsages::INDEX,
                 });
@@ -169,7 +169,7 @@ impl<'me, const N: usize> AtlasBuilder<'me, N> {
             self.renderer
                 .device()
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Atlas Vertex Buffer"),
+                    label: None,
                     contents: bytemuck::cast_slice(&vertices),
                     usage: wgpu::BufferUsages::VERTEX,
                 });

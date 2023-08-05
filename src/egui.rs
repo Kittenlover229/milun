@@ -78,7 +78,7 @@ impl EguiIntegration {
             .handle_platform_output(window, &self.context, egui_output.platform_output);
 
         let mut egui_render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Egui Render Pass"),
+            label: None,
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view,
                 resolve_target: None,

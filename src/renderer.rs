@@ -122,18 +122,18 @@ impl Renderer {
         surface.configure(&device, &config);
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Shader"),
+            label: None,
             source: wgpu::ShaderSource::Wgsl(include_str!("./shaders/main.wgsl").into()),
         });
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Vertex Buffer"),
+            label: None,
             contents: &[],
             usage: wgpu::BufferUsages::VERTEX,
         });
 
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Index Buffer"),
+            label: None,
             contents: &[],
             usage: wgpu::BufferUsages::INDEX,
         });
@@ -167,7 +167,7 @@ impl Renderer {
                         count: None,
                     },
                 ],
-                label: Some("Cold Bind Layout"),
+                label: None,
             });
 
         let hot_bind_group_layout =
@@ -182,18 +182,18 @@ impl Renderer {
                     },
                     count: None,
                 }],
-                label: Some("Hot Bind Layout"),
+                label: None,
             });
 
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Render Pipeline Layout"),
+                label: None,
                 bind_group_layouts: &[&cold_bind_group_layout, &hot_bind_group_layout],
                 push_constant_ranges: &[],
             });
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Render Pipeline"),
+            label: None,
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
@@ -238,7 +238,7 @@ impl Renderer {
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Rgba8UnormSrgb,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            label: Some("Atlas Texture"),
+            label: None,
             view_formats: &[],
         });
 
@@ -256,13 +256,13 @@ impl Renderer {
                     resource: wgpu::BindingResource::Sampler(&sampler),
                 },
             ],
-            label: Some("Cold Bind Group"),
+            label: None,
         });
 
         let camera = Camera::default();
 
         let camera_buffer = device.create_buffer(&BufferDescriptor {
-            label: Some("Camera Buffer"),
+            label: None,
             size: std::mem::size_of::<CameraRaw>() as u64,
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
             mapped_at_creation: false,
@@ -275,7 +275,7 @@ impl Renderer {
                 binding: 0,
                 resource: camera_buffer.as_entire_binding(),
             }],
-            label: Some("Cold Bind Group"),
+            label: None,
         });
 
         Self {
@@ -485,7 +485,7 @@ impl FrameBuilder<'_> {
             self.renderer
                 .device()
                 .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Render Encoder"),
+                    label: None,
                 });
 
         let Renderer {
@@ -508,7 +508,7 @@ impl FrameBuilder<'_> {
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Render Pass"),
+                label: None,
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
                     resolve_target: None,
