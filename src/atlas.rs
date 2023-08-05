@@ -196,6 +196,7 @@ impl<'me, const N: usize> AtlasBuilder<'me, N> {
         self.renderer.cold_bind_group = bind_group;
         self.renderer.sprites = sprites;
 
+        self.sprites.reverse();
         self.sprites
     }
 
