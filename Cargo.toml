@@ -14,7 +14,7 @@ pollster = "0.3"
 winit = { version = "0.28", features = [ "mint" ] }
 egui-winit = "^0.22"
 egui = { version = "^0.22", features = [ "cint", "mint", "extra_debug_asserts" ] }
-pyo3 = { version = "0.19.2", features = [ "hashbrown", "auto-initialize", "extension-module" ] }
+pyo3 = { version = "0.19.2", features = [ "hashbrown", "extension-module" ] }
 
 [dependencies.wgpu]
 version = "^0.16"

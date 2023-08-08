@@ -38,6 +38,8 @@ pub struct Renderer {
     pub(crate) camera: Camera,
     /// Camera's reflection on the GPU
     pub(crate) camera_buffer: wgpu::Buffer,
+    /// The background color to clear the buffer with
+    pub(crate) clear_color: Option<EncodedSrgb<u8>>,
 
     /*** Bind Groups ***/
     /// Bind Group for data that rarely changes
@@ -279,6 +281,7 @@ impl Renderer {
         });
 
         Self {
+            clear_color: None,
             cold_bind_group,
             hot_bind_group,
             atlas_bind_group_layout: cold_bind_group_layout,
@@ -481,12 +484,10 @@ impl FrameBuilder<'_> {
         self.renderer
             .reserve_instance_buffer_for(self.draw_sprites.len() as _);
 
-        let mut encoder =
-            self.renderer
-                .device()
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: None,
-                });
+        let mut encoder = self
+            .renderer
+            .device()
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
         let Renderer {
             queue,
@@ -501,6 +502,7 @@ impl FrameBuilder<'_> {
             device,
             config,
             egui_integration,
+            clear_color,
             ..
         } = self.renderer;
 
@@ -513,12 +515,15 @@ impl FrameBuilder<'_> {
                     view: &view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.1,
-                            g: 0.1,
-                            b: 0.1,
-                            a: 1.0,
-                        }),
+                        load: match clear_color {
+                            Some(color) => wgpu::LoadOp::Clear(wgpu::Color {
+                                r: color.r as f64 / 255.,
+                                g: color.g as f64 / 255.,
+                                b: color.b as f64 / 255.,
+                                a: 1.0,
+                            }),
+                            None => wgpu::LoadOp::Load,
+                        },
                         store: true,
                     },
                 })],
