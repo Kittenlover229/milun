@@ -23,4 +23,3 @@ pub use instance::*;
 pub use renderer::*;
 pub use sprite::*;
 pub use standalone::*;
-pub use py::*;
