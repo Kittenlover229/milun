@@ -5,16 +5,17 @@ use image::DynamicImage;
 use mint::Vector2;
 use pyo3::{buffer::PyBuffer, prelude::*, types::PyTuple};
 
-use crate::{GatheredInput, SpriteIndex, SpriteTransform, StandaloneRenderer};
+use crate::{StandaloneInputState, SpriteIndex, SpriteTransform, StandaloneRenderer};
 
+/// Input transferred to the Python's world.
 #[pyclass(name = "Input", frozen, unsendable)]
-pub struct Input {
-    gathered_input: GatheredInput,
+pub struct PythonInput {
+    gathered_input: StandaloneInputState,
     cursor_pos_world_space: Vector2<f32>,
 }
 
 #[pymethods]
-impl Input {
+impl PythonInput {
     #[getter]
     fn get_cursor_window_pos(&self, py: Python<'_>) -> PyObject {
         PyTuple::new(
@@ -22,8 +23,7 @@ impl Input {
             [
                 self.gathered_input.cursor_pos.x,
                 self.gathered_input.cursor_pos.y,
-            ]
-            .into_iter(),
+            ],
         )
         .to_object(py)
     }
@@ -32,12 +32,13 @@ impl Input {
     fn get_cursor_world_pos(&self, py: Python<'_>) -> PyObject {
         PyTuple::new(
             py,
-            [self.cursor_pos_world_space.x, self.cursor_pos_world_space.y].into_iter(),
+            [self.cursor_pos_world_space.x, self.cursor_pos_world_space.y],
         )
         .to_object(py)
     }
 }
 
+/// Adapter of the [`StandaloneRenderer`] to interact with Python's world.
 #[pyclass(name = "Renderer", unsendable)]
 pub struct PythonRenderer {
     new_background_color: OnceCell<Option<EncodedSrgb>>,
@@ -62,6 +63,7 @@ impl PythonRenderer {
         }
     }
 
+    /// Hijack the main loop with the callback to call when a redraw is requested.
     pub fn run<'py>(
         slf: PyRefMut<'py, Self>,
         py: Python<'py>,
@@ -85,7 +87,7 @@ impl PythonRenderer {
                 }
 
                 if !slf.sprites_to_add.is_empty() {
-                    let _ = std::mem::replace(&mut slf.sprites_to_add, vec![])
+                    let _ = std::mem::take(&mut slf.sprites_to_add)
                         .into_iter()
                         .fold(renderer.atlas(), |r, i| r.add_sprite_dynamically(i).0)
                         .finalize_and_repack();
@@ -98,7 +100,7 @@ impl PythonRenderer {
                     python,
                     (
                         x.clone(),
-                        Input {
+                        PythonInput {
                             gathered_input,
                             cursor_pos_world_space,
                         },
@@ -124,6 +126,9 @@ impl PythonRenderer {
         })
     }
 
+    /// Background color used for clearing the screen.
+    /// Either Some(color) or None, when None is used
+    /// the screen is not cleared.
     fn set_background_color<'py>(
         mut slf: PyRefMut<'py, Self>,
         py: Python<'py>,
@@ -144,11 +149,17 @@ impl PythonRenderer {
         Ok(())
     }
 
-    fn add_sprite<'py>(&mut self, py: Python<'py>, buffer: PyBuffer<u8>) -> SpriteIndex {
+    /// Queue a title update for the next frame
+    fn set_title(&mut self, title: &str) {
+        self.new_title = OnceCell::from(title.to_string())
+    }
+
+    /// Add a new sprite to the list of sprites for further drawing
+    fn add_sprite(&mut self, py: Python<'_>, buffer: PyBuffer<u8>) -> SpriteIndex {
         let buffer = buffer
             .as_slice(py)
             .unwrap()
-            .into_iter()
+            .iter()
             .map(|x| x.get())
             .collect::<Vec<_>>();
         let img = image::load_from_memory(&buffer).unwrap();
@@ -158,20 +169,17 @@ impl PythonRenderer {
         new_idx
     }
 
+    /// Add the sprite to the drawing queue
     fn draw(&mut self, py: Python<'_>, index: SpriteIndex, at: PyObject) -> PyResult<()> {
         self.to_draw_list
             .push((index, Vector2::from(at.extract::<[f32; 2]>(py)?)));
         Ok(())
-    }
-
-    fn set_title(&mut self, title: &str) {
-        self.new_title = OnceCell::from(title.to_string())
     }
 }
 
 #[pymodule]
 fn wffle(_py: Python<'_>, module: &PyModule) -> PyResult<()> {
     module.add_class::<PythonRenderer>()?;
-    module.add_class::<Input>()?;
+    module.add_class::<PythonInput>()?;
     Ok(())
 }

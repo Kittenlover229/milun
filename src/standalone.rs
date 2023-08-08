@@ -14,17 +14,22 @@ use winit::{
 
 use crate::{FrameBuilder, Renderer};
 
+/// Standalone renderer that instead of taking ownership of an existing window creates it's own.
 pub struct StandaloneRenderer {
+    /// Main renderer in control of the window.
     pub renderer: Renderer,
+    /// Event loop in which the `.run(..)` function is ran.
     pub event_loop: EventLoop<()>,
 }
 
+/// All the input gathered by the [`StandaloneRenderer`] since last frame.
 #[derive(Debug, Clone, Copy, Hash)]
-pub struct GatheredInput {
+pub struct StandaloneInputState {
+    /// Last recorded position of the cursor in window space.
     pub cursor_pos: Vector2<u32>,
 }
 
-impl Default for GatheredInput {
+impl Default for StandaloneInputState {
     fn default() -> Self {
         Self {
             cursor_pos: [0; 2].into(),
@@ -33,6 +38,7 @@ impl Default for GatheredInput {
 }
 
 impl StandaloneRenderer {
+    /// Create a new standalone renderer with the provided window title.
     pub fn new(window_title: impl Into<String>) -> Self {
         let event_loop = EventLoop::new();
         let window = WindowBuilder::new()
@@ -48,9 +54,10 @@ impl StandaloneRenderer {
 }
 
 impl StandaloneRenderer {
+    /// Run the event loop until an error is encountered, close request is received or `Esc` is pressed.
     pub fn run<E: Error>(
         self,
-        mut draw_callback: impl FnMut(&mut Renderer, GatheredInput) -> Result<FrameBuilder<'_>, E>
+        mut draw_callback: impl FnMut(&mut Renderer, StandaloneInputState) -> Result<FrameBuilder<'_>, E>
             + 'static,
     ) -> Result<(), E> {
         let StandaloneRenderer {
@@ -59,7 +66,7 @@ impl StandaloneRenderer {
             ..
         } = self;
 
-        let mut gathered_input = GatheredInput {
+        let mut gathered_input = StandaloneInputState {
             cursor_pos: [0; 2].into(),
         };
 

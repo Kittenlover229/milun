@@ -211,13 +211,15 @@ impl<'me, const N: usize> AtlasBuilder<'me, N> {
             },
         )
     }
-
+    
+    /// Add a sprite to the dynamically dispatched queue without adding it to
+    /// the list returned by `.finalize()` / `.finalize_and_repack()`.
     pub fn add_sprite_dynamically(
         mut self,
         image: impl Into<DynamicImage>,
     ) -> (Self, SpriteIndex) {
         self.rgba
-            .push(DynamicImage::from(image.into()).into_rgba8());
+            .push(image.into().into_rgba8());
 
         let new_idx = self.statically_dispatched_sprites.len()
             + self.dynamically_dispatched_sprites.len()
