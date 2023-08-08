@@ -3,11 +3,21 @@ use std::cell::OnceCell;
 use cint::EncodedSrgb;
 use pyo3::prelude::*;
 
-use crate::StandaloneRenderer;
+use crate::{StandaloneRenderer, GatheredInput};
 
 #[pyclass(name = "Renderer", unsendable)]
 pub struct PythonRenderer {
     new_background_color: OnceCell<Option<EncodedSrgb>>,
+    new_title: OnceCell<String>,
+}
+
+#[pyclass(name = "GatheredInput", frozen)]
+pub struct Input {}
+
+impl From<GatheredInput> for Input {
+    fn from(value: GatheredInput) -> Self {
+        Input {  }
+    }
 }
 
 #[pymethods]
@@ -16,6 +26,7 @@ impl PythonRenderer {
     pub fn new(_py: Python<'_>) -> Self {
         Self {
             new_background_color: OnceCell::new(),
+            new_title: OnceCell::new(),
         }
     }
 
@@ -28,22 +39,27 @@ impl PythonRenderer {
             let gil_pool = unsafe { py.new_pool() };
             let slf = slf.into_py(py);
 
-            move |renderer, _input| {
+            move |renderer, input| {
                 let python = gil_pool.python();
-                let ref_slf = slf.clone();
-                redraw_callback.call1(python, (ref_slf.as_ref(python),))?;
-                let x: Py<Self> = slf.extract(python)?;
-                let mut z = x.borrow_mut(python);
-                if let Some(color) = z.new_background_color.take() {
+                let slf: Py<Self> = slf.extract::<Py<Self>>(python)?;
+                let mut slf = slf.borrow_mut(python);
+
+                if let Some(color) = slf.new_background_color.take() {
                     renderer.clear_color = color;
                 }
+
+                if let Some(title) = slf.new_title.take() {
+                    renderer.window.set_title(&title);
+                }
+
+                redraw_callback.call1(python, (slf, Input::from(input)))?;
 
                 Ok(renderer.begin_frame())
             }
         })
     }
 
-    pub fn set_background_color<'py>(
+    fn set_background_color<'py>(
         mut slf: PyRefMut<'py, Self>,
         py: Python<'py>,
         colors: PyObject,
@@ -61,6 +77,10 @@ impl PythonRenderer {
         });
 
         Ok(())
+    }
+
+    fn set_title(&mut self, title: &str) {
+        self.new_title = OnceCell::from(title.to_string())
     }
 }
 
