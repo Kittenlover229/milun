@@ -87,6 +87,8 @@ impl<'me, const N: usize> AtlasBuilder<'me, N> {
             let x = pos.x as f32 / width as f32;
             let y = pos.y as f32 / height as f32;
 
+            let sprite_aspect_ratio = sprite.width() as f32 / sprite.height() as f32;
+
             let verts = [
                 Vertex {
                     position: [-0.5, -0.5, 0.0],
@@ -107,7 +109,15 @@ impl<'me, const N: usize> AtlasBuilder<'me, N> {
                     position: [0.5, 0.5, 0.0],
                     tex_coords: [x + x_step * sprite.width() as f32, y],
                 },
-            ];
+            ]
+            .map(|vert| {
+                let [x, y, z] = vert.position;
+
+                Vertex {
+                    position: [x * sprite_aspect_ratio, y, z],
+                    ..vert
+                }
+            });
 
             let inds = [0, 1, 2, 1, 3, 2].map(|i| i + vertices.len() as u32);
 
@@ -211,15 +221,11 @@ impl<'me, const N: usize> AtlasBuilder<'me, N> {
             },
         )
     }
-    
+
     /// Add a sprite to the dynamically dispatched queue without adding it to
     /// the list returned by `.finalize()` / `.finalize_and_repack()`.
-    pub fn add_sprite_dynamically(
-        mut self,
-        image: impl Into<DynamicImage>,
-    ) -> (Self, SpriteIndex) {
-        self.rgba
-            .push(image.into().into_rgba8());
+    pub fn add_sprite_dynamically(mut self, image: impl Into<DynamicImage>) -> (Self, SpriteIndex) {
+        self.rgba.push(image.into().into_rgba8());
 
         let new_idx = self.statically_dispatched_sprites.len()
             + self.dynamically_dispatched_sprites.len()
