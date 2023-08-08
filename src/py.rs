@@ -86,20 +86,14 @@ impl PythonRenderer {
                     renderer.window.set_title(&title);
                 }
 
-                if !slf.sprites_to_add.is_empty() {
-                    let _ = std::mem::take(&mut slf.sprites_to_add)
-                        .into_iter()
-                        .fold(renderer.atlas(), |r, i| r.add_sprite_dynamically(i).0)
-                        .finalize_and_repack();
-                }
+
 
                 let cursor_pos_world_space = renderer.window_to_world(gathered_input.cursor_pos);
 
-                let x = slf.into_py(python);
                 redraw_callback.call1(
                     python,
                     (
-                        x.clone(),
+                        slf.into_py(python),
                         PythonInput {
                             gathered_input,
                             cursor_pos_world_space,
@@ -107,9 +101,17 @@ impl PythonRenderer {
                     ),
                 )?;
 
+                let mut self_borrow = self_py.borrow_mut(python);
+                if !self_borrow.sprites_to_add.is_empty() {
+                    let _ = std::mem::take(&mut self_borrow.sprites_to_add)
+                        .into_iter()
+                        .fold(renderer.atlas(), |r, i| r.add_sprite_dynamically(i).0)
+                        .finalize_and_repack();
+                }
+
                 let mut frame_builder = renderer.begin_frame();
 
-                let draw_list = &mut self_py.borrow_mut(python).to_draw_list;
+                let draw_list = &mut self_borrow.to_draw_list;
                 for (draw_idx, pos) in draw_list.iter() {
                     frame_builder = frame_builder.draw_sprite_indexed(
                         *draw_idx,
