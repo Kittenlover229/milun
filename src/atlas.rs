@@ -10,7 +10,9 @@ use wgpu::util::DeviceExt;
 pub struct AtlasBuilder<'renderer, const N: usize> {
     pub(crate) rgba: Vec<RgbaImage>,
     pub(crate) renderer: &'renderer mut Renderer,
-    pub(crate) sprites: [SpriteIndex; N],
+
+    pub(crate) dynamically_dispatched_sprites: Vec<SpriteIndex>,
+    pub(crate) statically_dispatched_sprites: [SpriteIndex; N],
 }
 
 impl<'me, const N: usize> AtlasBuilder<'me, N> {
@@ -196,8 +198,8 @@ impl<'me, const N: usize> AtlasBuilder<'me, N> {
         self.renderer.cold_bind_group = bind_group;
         self.renderer.sprites = sprites;
 
-        self.sprites.reverse();
-        self.sprites
+        self.statically_dispatched_sprites.reverse();
+        self.statically_dispatched_sprites
     }
 
     /// Add a sprite into the queue later to be stitched (and maybe packed).
@@ -210,6 +212,24 @@ impl<'me, const N: usize> AtlasBuilder<'me, N> {
         )
     }
 
+    pub fn add_sprite_dynamically(
+        mut self,
+        image: impl Into<DynamicImage>,
+        out: &mut Vec<SpriteIndex>,
+    ) -> Self {
+        self.rgba
+            .push(DynamicImage::from(image.into()).into_rgba8());
+
+        let new_idx = self.statically_dispatched_sprites.len()
+            + self.dynamically_dispatched_sprites.len()
+            + self.renderer.sprites.len();
+
+        self.dynamically_dispatched_sprites.push(new_idx);
+        out.push(new_idx);
+
+        self
+    }
+
     /// Add a sprite with options not activated by default
     pub fn add_sprite_advanced(
         self,
@@ -219,7 +239,9 @@ impl<'me, const N: usize> AtlasBuilder<'me, N> {
         let AtlasBuilder {
             mut rgba,
             renderer,
-            sprites,
+            statically_dispatched_sprites,
+            dynamically_dispatched_sprites,
+            ..
         } = self;
 
         let SpriteLoadOptions { premultiplied, .. } = options.into();
@@ -233,16 +255,21 @@ impl<'me, const N: usize> AtlasBuilder<'me, N> {
             }
         }
 
-        let len = renderer.sprites.len();
-        let mut sprites_iterator = sprites
-            .into_iter()
-            .chain(std::iter::once(sprites.len() + len));
+        let mut sprites_iterator =
+            statically_dispatched_sprites
+                .into_iter()
+                .chain(std::iter::once(
+                    statically_dispatched_sprites.len()
+                        + dynamically_dispatched_sprites.len()
+                        + renderer.sprites.len(),
+                ));
         rgba.push(DynamicImage::from(rgba32f).to_rgba8());
 
         AtlasBuilder {
             rgba,
             renderer,
-            sprites: [(); N + 1].map(|_| sprites_iterator.next().unwrap()),
+            statically_dispatched_sprites: [(); N + 1].map(|_| sprites_iterator.next().unwrap()),
+            dynamically_dispatched_sprites,
         }
     }
 }

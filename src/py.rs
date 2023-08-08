@@ -1,10 +1,11 @@
-use std::cell::OnceCell;
+use std::{borrow::BorrowMut, cell::OnceCell};
 
 use cint::EncodedSrgb;
+use image::DynamicImage;
 use mint::Vector2;
-use pyo3::{prelude::*, types::PyTuple};
+use pyo3::{buffer::PyBuffer, prelude::*, types::PyTuple};
 
-use crate::{GatheredInput, StandaloneRenderer};
+use crate::{GatheredInput, SpriteIndex, SpriteTransform, StandaloneRenderer};
 
 #[pyclass(name = "Input", frozen, unsendable)]
 pub struct Input {
@@ -41,6 +42,9 @@ impl Input {
 pub struct PythonRenderer {
     new_background_color: OnceCell<Option<EncodedSrgb>>,
     new_title: OnceCell<String>,
+
+    sprites_to_add: Vec<DynamicImage>,
+    to_draw_list: Vec<(SpriteIndex, Vector2<f32>)>,
 }
 
 #[pymethods]
@@ -50,6 +54,8 @@ impl PythonRenderer {
         Self {
             new_background_color: OnceCell::new(),
             new_title: OnceCell::new(),
+            sprites_to_add: vec![],
+            to_draw_list: vec![],
         }
     }
 
@@ -75,12 +81,23 @@ impl PythonRenderer {
                     renderer.window.set_title(&title);
                 }
 
+                if !slf.sprites_to_add.is_empty() {
+                    let mut indices = vec![];
+                    let _ = std::mem::replace(&mut slf.sprites_to_add, vec![])
+                        .into_iter()
+                        .fold(renderer.atlas(), |r, i| {
+                            r.add_sprite_dynamically(i, &mut indices)
+                        })
+                        .finalize_and_repack();
+                }
+
                 let cursor_pos_world_space = renderer.window_to_world(gathered_input.cursor_pos);
 
+                let x = slf.into_py(python);
                 redraw_callback.call1(
                     python,
                     (
-                        slf,
+                        x.clone(),
                         Input {
                             gathered_input,
                             cursor_pos_world_space,
@@ -88,7 +105,22 @@ impl PythonRenderer {
                     ),
                 )?;
 
-                Ok(renderer.begin_frame())
+                let mut frame_builder = renderer.begin_frame();
+
+                let slf = x.extract::<Py<Self>>(python)?;
+                let draw_list = &mut slf.borrow_mut(python).to_draw_list;
+                for (draw_idx, pos) in draw_list.iter() {
+                    frame_builder = frame_builder.draw_sprite_indexed(
+                        *draw_idx,
+                        *pos,
+                        SpriteTransform::default(),
+                        [0xFF; 3],
+                        1.,
+                    )
+                }
+                draw_list.clear();
+
+                Ok(frame_builder)
             }
         })
     }
@@ -110,6 +142,23 @@ impl PythonRenderer {
             Some(EncodedSrgb::from(colors))
         });
 
+        Ok(())
+    }
+
+    fn add_sprite<'py>(&mut self, py: Python<'py>, buffer: PyBuffer<u8>) {
+        let buffer = buffer
+            .as_slice(py)
+            .unwrap()
+            .into_iter()
+            .map(|x| x.get())
+            .collect::<Vec<_>>();
+        let img = image::load_from_memory(&buffer).unwrap();
+        self.sprites_to_add.push(img);
+    }
+
+    fn draw(&mut self, py: Python<'_>, index: SpriteIndex, at: PyObject) -> PyResult<()> {
+        self.to_draw_list
+            .push((index, Vector2::from(at.extract::<[f32; 2]>(py)?)));
         Ok(())
     }
 

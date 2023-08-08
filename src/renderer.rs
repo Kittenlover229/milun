@@ -335,7 +335,8 @@ impl Renderer {
         AtlasBuilder {
             renderer: self,
             rgba: vec![],
-            sprites: [],
+            statically_dispatched_sprites: [],
+            dynamically_dispatched_sprites: vec![],
         }
     }
 
