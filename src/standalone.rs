@@ -100,6 +100,7 @@ impl StandaloneRenderer {
                             Ok(res) => res,
                             Err(err) => {
                                 *error_return = err.into();
+                                *control_flow = ControlFlow::Exit;
                                 return;
                             }
                         };
