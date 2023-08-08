@@ -7,3 +7,11 @@ class Renderer:
     def set_background_color(
         self, tuple: Tuple[int, int, int] | Tuple[float, float, float]
     ) -> None: ...
+
+class Input:
+    def __init__(self):
+        self.cursor_pos: tuple[int, int]
+    @property
+    def cursor_window_pos(self) -> tuple[int, int]: ...
+    @property
+    def cursor_world_pos(self) -> tuple[float, float]: ...

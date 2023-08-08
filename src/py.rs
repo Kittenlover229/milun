@@ -1,23 +1,46 @@
 use std::cell::OnceCell;
 
 use cint::EncodedSrgb;
-use pyo3::prelude::*;
+use mint::Vector2;
+use pyo3::{prelude::*, types::PyTuple};
 
-use crate::{StandaloneRenderer, GatheredInput};
+use crate::{GatheredInput, StandaloneRenderer};
+
+#[pyclass(name = "Input", frozen, unsendable)]
+pub struct Input {
+    gathered_input: GatheredInput,
+    cursor_pos_world_space: Vector2<f32>,
+}
+
+#[pymethods]
+impl Input {
+    #[getter]
+    fn get_cursor_window_pos(&self, py: Python<'_>) -> PyObject {
+        PyTuple::new(
+            py,
+            [
+                self.gathered_input.cursor_pos.x,
+                self.gathered_input.cursor_pos.y,
+            ]
+            .into_iter(),
+        )
+        .to_object(py)
+    }
+
+    #[getter]
+    fn get_cursor_world_pos(&self, py: Python<'_>) -> PyObject {
+        PyTuple::new(
+            py,
+            [self.cursor_pos_world_space.x, self.cursor_pos_world_space.y].into_iter(),
+        )
+        .to_object(py)
+    }
+}
 
 #[pyclass(name = "Renderer", unsendable)]
 pub struct PythonRenderer {
     new_background_color: OnceCell<Option<EncodedSrgb>>,
     new_title: OnceCell<String>,
-}
-
-#[pyclass(name = "GatheredInput", frozen)]
-pub struct Input {}
-
-impl From<GatheredInput> for Input {
-    fn from(value: GatheredInput) -> Self {
-        Input {  }
-    }
 }
 
 #[pymethods]
@@ -39,7 +62,7 @@ impl PythonRenderer {
             let gil_pool = unsafe { py.new_pool() };
             let slf = slf.into_py(py);
 
-            move |renderer, input| {
+            move |renderer, gathered_input| {
                 let python = gil_pool.python();
                 let slf: Py<Self> = slf.extract::<Py<Self>>(python)?;
                 let mut slf = slf.borrow_mut(python);
@@ -52,7 +75,18 @@ impl PythonRenderer {
                     renderer.window.set_title(&title);
                 }
 
-                redraw_callback.call1(python, (slf, Input::from(input)))?;
+                let cursor_pos_world_space = renderer.window_to_world(gathered_input.cursor_pos);
+
+                redraw_callback.call1(
+                    python,
+                    (
+                        slf,
+                        Input {
+                            gathered_input,
+                            cursor_pos_world_space,
+                        },
+                    ),
+                )?;
 
                 Ok(renderer.begin_frame())
             }
