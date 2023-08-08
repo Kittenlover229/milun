@@ -215,8 +215,7 @@ impl<'me, const N: usize> AtlasBuilder<'me, N> {
     pub fn add_sprite_dynamically(
         mut self,
         image: impl Into<DynamicImage>,
-        out: &mut Vec<SpriteIndex>,
-    ) -> Self {
+    ) -> (Self, SpriteIndex) {
         self.rgba
             .push(DynamicImage::from(image.into()).into_rgba8());
 
@@ -225,9 +224,8 @@ impl<'me, const N: usize> AtlasBuilder<'me, N> {
             + self.renderer.sprites.len();
 
         self.dynamically_dispatched_sprites.push(new_idx);
-        out.push(new_idx);
 
-        self
+        (self, new_idx)
     }
 
     /// Add a sprite with options not activated by default

@@ -1,4 +1,4 @@
-use std::{borrow::BorrowMut, cell::OnceCell};
+use std::cell::OnceCell;
 
 use cint::EncodedSrgb;
 use image::DynamicImage;
@@ -45,6 +45,8 @@ pub struct PythonRenderer {
 
     sprites_to_add: Vec<DynamicImage>,
     to_draw_list: Vec<(SpriteIndex, Vector2<f32>)>,
+
+    last_sprite_index: SpriteIndex,
 }
 
 #[pymethods]
@@ -56,6 +58,7 @@ impl PythonRenderer {
             new_title: OnceCell::new(),
             sprites_to_add: vec![],
             to_draw_list: vec![],
+            last_sprite_index: 0,
         }
     }
 
@@ -66,12 +69,12 @@ impl PythonRenderer {
     ) -> PyResult<()> {
         StandaloneRenderer::new("Hello, Python!").run({
             let gil_pool = unsafe { py.new_pool() };
-            let slf = slf.into_py(py);
+            let self_py = slf.into_py(py);
 
             move |renderer, gathered_input| {
                 let python = gil_pool.python();
-                let slf: Py<Self> = slf.extract::<Py<Self>>(python)?;
-                let mut slf = slf.borrow_mut(python);
+                let self_py: Py<Self> = self_py.extract::<Py<Self>>(python)?;
+                let mut slf = self_py.borrow_mut(python);
 
                 if let Some(color) = slf.new_background_color.take() {
                     renderer.clear_color = color;
@@ -82,12 +85,9 @@ impl PythonRenderer {
                 }
 
                 if !slf.sprites_to_add.is_empty() {
-                    let mut indices = vec![];
                     let _ = std::mem::replace(&mut slf.sprites_to_add, vec![])
                         .into_iter()
-                        .fold(renderer.atlas(), |r, i| {
-                            r.add_sprite_dynamically(i, &mut indices)
-                        })
+                        .fold(renderer.atlas(), |r, i| r.add_sprite_dynamically(i).0)
                         .finalize_and_repack();
                 }
 
@@ -107,8 +107,7 @@ impl PythonRenderer {
 
                 let mut frame_builder = renderer.begin_frame();
 
-                let slf = x.extract::<Py<Self>>(python)?;
-                let draw_list = &mut slf.borrow_mut(python).to_draw_list;
+                let draw_list = &mut self_py.borrow_mut(python).to_draw_list;
                 for (draw_idx, pos) in draw_list.iter() {
                     frame_builder = frame_builder.draw_sprite_indexed(
                         *draw_idx,
@@ -145,7 +144,7 @@ impl PythonRenderer {
         Ok(())
     }
 
-    fn add_sprite<'py>(&mut self, py: Python<'py>, buffer: PyBuffer<u8>) {
+    fn add_sprite<'py>(&mut self, py: Python<'py>, buffer: PyBuffer<u8>) -> SpriteIndex {
         let buffer = buffer
             .as_slice(py)
             .unwrap()
@@ -153,7 +152,10 @@ impl PythonRenderer {
             .map(|x| x.get())
             .collect::<Vec<_>>();
         let img = image::load_from_memory(&buffer).unwrap();
+        let new_idx = self.last_sprite_index;
+        self.last_sprite_index += 1;
         self.sprites_to_add.push(img);
+        new_idx
     }
 
     fn draw(&mut self, py: Python<'_>, index: SpriteIndex, at: PyObject) -> PyResult<()> {
@@ -170,5 +172,6 @@ impl PythonRenderer {
 #[pymodule]
 fn wffle(_py: Python<'_>, module: &PyModule) -> PyResult<()> {
     module.add_class::<PythonRenderer>()?;
+    module.add_class::<Input>()?;
     Ok(())
 }
