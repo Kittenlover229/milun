@@ -1,12 +1,17 @@
 use cint::EncodedSrgb;
+
+#[cfg(feature = "egui")]
+use crate::egui::EguiIntegration;
+#[cfg(feature = "egui")]
 use egui::Context;
+
 use mint::Vector2;
 use wgpu::{util::DeviceExt, Buffer, BufferDescriptor, BufferUsages};
 use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window};
 
 use crate::{
-    egui::EguiIntegration, vertex::Vertex, AtlasBuilder, Camera, CameraRaw, RawSpriteInstance,
-    SpriteDrawData, SpriteIndex, SpriteInstance, SpriteTransform,
+    vertex::Vertex, AtlasBuilder, Camera, CameraRaw, RawSpriteInstance, SpriteDrawData,
+    SpriteIndex, SpriteInstance, SpriteTransform,
 };
 
 /// The main object used for drawing. Use `.atlas()` to load new sprites and
@@ -62,9 +67,11 @@ pub struct Renderer {
     pub(crate) index_buffer: Buffer,
 
     /*** EGUI Integration ***/
+    #[cfg(feature = "egui")]
     pub(crate) egui_integration: EguiIntegration,
 }
 
+#[cfg(feature = "sync-new")]
 impl From<Window> for Renderer {
     fn from(window: Window) -> Self {
         pollster::block_on(Renderer::new(window))
@@ -286,6 +293,7 @@ impl Renderer {
             hot_bind_group,
             atlas_bind_group_layout: cold_bind_group_layout,
 
+            #[cfg(feature = "egui")]
             egui_integration: { EguiIntegration::new(&window, &device, surface_format) },
 
             camera: Default::default(),
@@ -313,6 +321,7 @@ impl Renderer {
     /// Handle window inputs that influence the renderer, returns `true` if
     /// the input was consumed and `false` otherwise.
     pub fn input(&mut self, event: &WindowEvent) -> bool {
+        #[cfg(feature = "egui")]
         if self.egui_integration.input(event) {
             return true;
         }
@@ -432,6 +441,7 @@ pub struct FrameBuilder<'renderer> {
 
 impl<'renderer> From<&'renderer mut Renderer> for FrameBuilder<'renderer> {
     fn from(renderer: &'renderer mut Renderer) -> Self {
+        #[cfg(feature = "egui")]
         renderer.egui_integration.begin_frame(&renderer.window);
         FrameBuilder {
             renderer,
@@ -469,6 +479,7 @@ impl FrameBuilder<'_> {
         self
     }
 
+    #[cfg(feature = "egui")]
     pub fn draw_egui(self, show: impl FnOnce(&Context)) -> Self {
         show(&self.renderer.egui_integration.context);
         self
@@ -499,10 +510,14 @@ impl FrameBuilder<'_> {
             sprites,
             cold_bind_group,
             hot_bind_group,
-            window,
-            device,
-            config,
+            #[cfg(feature = "egui")]
             egui_integration,
+            #[cfg(feature = "egui")]
+            window,
+            #[cfg(feature = "egui")]
+            device,
+            #[cfg(feature = "egui")]
+            config,
             clear_color,
             ..
         } = self.renderer;
@@ -552,6 +567,7 @@ impl FrameBuilder<'_> {
             );
         }
 
+        #[cfg(feature = "egui")]
         egui_integration.end_frame(window, device, queue, config, &view, &mut encoder);
 
         queue.submit(std::iter::once(encoder.finish()));
