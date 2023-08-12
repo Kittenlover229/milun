@@ -4,10 +4,15 @@ use wgpu::{Device, Queue, SurfaceConfiguration, TextureView};
 use winit::{event::WindowEvent, window::Window};
 
 /// Manages all the processing done by egui.
-pub(crate) struct EguiIntegration {
+pub struct EguiIntegration {
     pub(crate) input_state: egui_winit::State,
     pub(crate) context: EguiContext,
     pub(crate) egui_renderer: EguiRenderer,
+
+    /// Whether all of the inputs that egui uses should not be used by the user.
+    /// For instance, if enabled when dragging a window the [`StandaloneInputState`]
+    /// would still recieve updates.
+    pub consume_captured_inputs: bool,
 }
 
 impl EguiIntegration {
@@ -24,13 +29,15 @@ impl EguiIntegration {
             input_state: egui_input_state,
             context: egui_context,
             egui_renderer,
+
+            consume_captured_inputs: true,
         }
     }
 }
 
 impl EguiIntegration {
     pub(crate) fn input(&mut self, event: &WindowEvent) -> bool {
-        self.input_state.on_event(&self.context, event).consumed
+        self.input_state.on_event(&self.context, event).consumed && self.consume_captured_inputs
     }
 
     pub(crate) fn begin_frame(&mut self, window: &Window) {

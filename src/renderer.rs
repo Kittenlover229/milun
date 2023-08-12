@@ -73,7 +73,7 @@ pub struct Renderer {
 
     /*** EGUI Integration ***/
     #[cfg(feature = "egui")]
-    pub(crate) egui_integration: EguiIntegration,
+    pub egui_integration: EguiIntegration,
 }
 
 #[cfg(feature = "sync-new")]

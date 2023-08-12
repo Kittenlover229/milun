@@ -7,6 +7,7 @@ const FOREGROUND: &str = "foreground";
 
 fn main() {
     let mut renderer = StandaloneRenderer::new("Wffle Quickstart Example");
+    renderer.egui_integration.consume_captured_inputs = false;
     renderer.set_layer(BACKGROUND, 0);
     renderer.set_layer(FOREGROUND, 5);
 
