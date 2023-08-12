@@ -36,7 +36,7 @@ fn vs_main(
     var out: VertexOutput;
 
     let coss = cos(instance.angle);
-    let sinn = sqrt(1. - coss * coss);
+    let sinn = sin(instance.angle);
     let rotor = 
         mat3x3(
             coss, sinn, 0.,
