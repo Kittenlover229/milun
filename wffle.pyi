@@ -7,7 +7,13 @@ class Renderer:
     def set_background_color(
         self, tuple: Tuple[int, int, int] | Tuple[float, float, float]
     ) -> None: ...
-    def draw(self, sprite_index: int, position: Tuple[float, float]) -> None: ...
+    def draw(
+        self,
+        sprite_index: int,
+        position: Tuple[float, float],
+        *,
+        layer: Union[None, str, int] = None
+    ) -> None: ...
     def add_sprite(self, buffer: bytes) -> int: ...
 
 class Input:

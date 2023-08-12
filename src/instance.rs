@@ -57,6 +57,17 @@ pub struct SpriteInstance {
     pub opacity: f32,
 }
 
+impl Default for SpriteInstance {
+    fn default() -> Self {
+        Self {
+            position: [0.; 2].into(),
+            transform: Default::default(),
+            color: [0xFFu8; 3].into(),
+            opacity: 1.,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone, Copy, Default, Zeroable, Pod)]
 #[repr(C)]
 pub(crate) struct RawSpriteInstance {

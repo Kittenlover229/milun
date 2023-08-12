@@ -1,12 +1,13 @@
 import wffle
 import time
+from math import sin, cos
 
 frame_counter = 0
 
 renderer = wffle.Renderer()
 
 begin = time.perf_counter()
-renderer.set_background_color([0xFF, 0xFF, 0xFF])
+renderer.set_background_color(None)
 
 sprite8x8 = renderer.add_sprite(open("examples/8x8.png", "rb").read())
 sprite8x16 = renderer.add_sprite(open("examples/8x16.png", "rb").read())
@@ -23,7 +24,10 @@ def draw(renderer: wffle.Renderer, inputs):
         sett = True
 
     frame_counter += 1
-    renderer.draw(frame_counter % 3, inputs.cursor_world_pos)
+    renderer.draw(2, [cos(6 * time.time()) + 1, 0.33 * sin(3 * time.time()) + 1], layer = 1)
+    renderer.draw(0, [0, 0], layer = 0)
+
+    renderer.draw(1, inputs.cursor_world_pos, layer=2)
     renderer.set_title(f"{frame_counter}, {inputs.cursor_window_pos}")
 
 

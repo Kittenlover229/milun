@@ -5,29 +5,23 @@ edition = "2021"
 resolver = "2"
 
 [dependencies]
-bytemuck = { version = "1.13", features = [ "derive" ] }
+wgpu = { version = "0.16", features = ["trace", "webgl"] }
+image = { version = "0.24", default-features = false, features = ["png", "jpeg"] }
+bytemuck = { version = "1.13", features = ["derive"] }
 cint = "0.3.1"
 hashbrown = "0.14"
 mint = "0.5.9"
 pollster = { version = "0.3", optional = true }
-winit = { version = "0.28", features = [ "mint" ] }
-egui-wgpu = { version = "^0.22", features = [ "winit" ], optional = true }
+winit = { version = "0.28", features = ["mint"] }
+egui-wgpu = { version = "^0.22", features = ["winit"], optional = true }
 egui-winit = { version = "^0.22", optional = true }
-egui = { version = "^0.22", features = [ "cint", "mint", "extra_debug_asserts" ], optional = true }
-pyo3 = { version = "0.19.2", features = [ "hashbrown", "extension-module" ], optional = true }
+egui = { version = "^0.22", features = ["cint", "mint", "extra_debug_asserts"], optional = true }
+pyo3 = { version = "0.19.2", features = ["hashbrown", "extension-module"], optional = true }
 
-[dependencies.wgpu]
-version = "^0.16"
-features = ["trace", "webgl"]
-
-[dependencies.image]
-version = "0.24"
-default-features = false
-features = ["png", "jpeg"]
 
 [features]
 sync-new = ["dep:pollster"]
 standalone = ["sync-new"]
 egui = ["dep:egui", "dep:egui-winit", "dep:egui-wgpu"]
-py = ["standalone"]
-default = ["standalone", "egui"]
+py = ["standalone", "dep:pyo3"]
+default = ["standalone", "egui", "py"]

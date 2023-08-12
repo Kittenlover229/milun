@@ -13,6 +13,7 @@ mod instance;
 mod renderer;
 mod sprite;
 mod vertex;
+mod layer;
 #[cfg(feature = "egui")]
 mod egui;
 #[cfg(feature = "standalone")]
@@ -21,6 +22,7 @@ mod standalone;
 mod py;
 
 pub use atlas::*;
+pub use layer::*;
 pub use camera::*;
 pub use instance::*;
 pub use renderer::*;

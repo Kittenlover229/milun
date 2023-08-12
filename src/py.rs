@@ -5,7 +5,7 @@ use image::DynamicImage;
 use mint::Vector2;
 use pyo3::{buffer::PyBuffer, prelude::*, types::PyTuple};
 
-use crate::{StandaloneInputState, SpriteIndex, SpriteTransform, StandaloneRenderer};
+use crate::{SpriteIndex, SpriteInstance, StandaloneInputState, StandaloneRenderer, LayerIdentifier};
 
 /// Input transferred to the Python's world.
 #[pyclass(name = "Input", frozen, unsendable)]
@@ -45,7 +45,7 @@ pub struct PythonRenderer {
     new_title: OnceCell<String>,
 
     sprites_to_add: Vec<DynamicImage>,
-    to_draw_list: Vec<(SpriteIndex, Vector2<f32>)>,
+    to_draw_list: Vec<(SpriteIndex, Option<LayerIdentifier>, Vector2<f32>)>,
 
     last_sprite_index: SpriteIndex,
 }
@@ -86,8 +86,6 @@ impl PythonRenderer {
                     renderer.window.set_title(&title);
                 }
 
-
-
                 let cursor_pos_world_space = renderer.window_to_world(gathered_input.cursor_pos);
 
                 redraw_callback.call1(
@@ -112,13 +110,14 @@ impl PythonRenderer {
                 let mut frame_builder = renderer.begin_frame();
 
                 let draw_list = &mut self_borrow.to_draw_list;
-                for (draw_idx, pos) in draw_list.iter() {
+                for (draw_idx, layer, pos) in draw_list.iter() {
                     frame_builder = frame_builder.draw_sprite_indexed(
                         *draw_idx,
-                        *pos,
-                        SpriteTransform::default(),
-                        [0xFF; 3],
-                        1.,
+                        layer.to_owned().unwrap_or_default(),
+                        SpriteInstance {
+                            position: *pos,
+                            ..Default::default()
+                        },
                     )
                 }
                 draw_list.clear();
@@ -172,9 +171,9 @@ impl PythonRenderer {
     }
 
     /// Add the sprite to the drawing queue
-    fn draw(&mut self, py: Python<'_>, index: SpriteIndex, at: PyObject) -> PyResult<()> {
+    fn draw(&mut self, py: Python<'_>, index: SpriteIndex, at: PyObject, layer: Option<LayerIdentifier>) -> PyResult<()> {
         self.to_draw_list
-            .push((index, Vector2::from(at.extract::<[f32; 2]>(py)?)));
+            .push((index, layer, Vector2::from(at.extract::<[f32; 2]>(py)?)));
         Ok(())
     }
 }

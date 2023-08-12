@@ -11,7 +11,7 @@ use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window};
 
 use crate::{
     vertex::Vertex, AtlasBuilder, Camera, CameraRaw, RawSpriteInstance, SpriteDrawData,
-    SpriteIndex, SpriteInstance, SpriteTransform,
+    SpriteIndex, SpriteInstance, LayerIdentifier,
 };
 
 /// The main object used for drawing. Use `.atlas()` to load new sprites and
@@ -45,6 +45,11 @@ pub struct Renderer {
     pub(crate) camera_buffer: wgpu::Buffer,
     /// The background color to clear the buffer with
     pub(crate) clear_color: Option<EncodedSrgb<u8>>,
+
+    /*** Misc ***/
+    /// To avoid using magic numbers you can name layers. The layer names are
+    /// resolved from this table.
+    pub(crate) named_layers: hashbrown::HashMap<String, i32>,
 
     /*** Bind Groups ***/
     /// Bind Group for data that rarely changes
@@ -313,6 +318,7 @@ impl Renderer {
             queue,
             config,
             render_pipeline,
+            named_layers: [].into(),
         }
     }
 }
@@ -389,6 +395,10 @@ impl Renderer {
         );
     }
 
+    pub fn set_layer(&mut self, name: impl ToString, constant: i32) {
+        self.named_layers.insert(name.to_string(), constant);
+    }
+
     pub fn window_to_world(&self, window_position: impl Into<Vector2<u32>>) -> Vector2<f32> {
         let [x, y] = <[u32; 2]>::from(window_position.into()).map(|v| v as f32);
         let [x, y] = [
@@ -436,7 +446,7 @@ impl Renderer {
 #[must_use]
 pub struct FrameBuilder<'renderer> {
     renderer: &'renderer mut Renderer,
-    draw_sprites: Vec<(SpriteIndex, SpriteInstance)>,
+    draw_sprites: Vec<(SpriteIndex, (LayerIdentifier, SpriteInstance))>,
 }
 
 impl<'renderer> From<&'renderer mut Renderer> for FrameBuilder<'renderer> {
@@ -462,20 +472,10 @@ impl FrameBuilder<'_> {
     pub fn draw_sprite_indexed(
         mut self,
         sprite_idx: SpriteIndex,
-        position: impl Into<Vector2<f32>>,
-        transform: impl Into<SpriteTransform>,
-        color: impl Into<EncodedSrgb<u8>>,
-        opacity: f32,
+        layer_id: impl Into<LayerIdentifier>,
+        instance: impl Into<SpriteInstance>,
     ) -> Self {
-        self.draw_sprites.push((
-            sprite_idx,
-            SpriteInstance {
-                position: position.into(),
-                transform: transform.into(),
-                color: color.into(),
-                opacity,
-            },
-        ));
+        self.draw_sprites.push((sprite_idx, (layer_id.into(), instance.into())));
         self
     }
 
@@ -486,7 +486,7 @@ impl FrameBuilder<'_> {
     }
 
     /// Finishes the frame and presents it onto the [`Renderer`]'s surface.
-    pub fn end_frame(self) -> Result<(), wgpu::SurfaceError> {
+    pub fn end_frame(mut self) -> Result<(), wgpu::SurfaceError> {
         let output = self.renderer.surface.get_current_texture()?;
 
         let view = output
@@ -519,8 +519,14 @@ impl FrameBuilder<'_> {
             #[cfg(feature = "egui")]
             config,
             clear_color,
+            named_layers,
             ..
         } = self.renderer;
+
+        self.draw_sprites.sort_by_key(|(_, (layer_id, _))| *match layer_id {
+            LayerIdentifier::Ordinal(c) => c,
+            LayerIdentifier::Named(named) => named_layers.get(named.as_ref()).to_owned().unwrap_or(&0),
+        });
 
         let (sprite_indices, instances): (Vec<_>, Vec<_>) = self.draw_sprites.into_iter().unzip();
 
@@ -563,7 +569,7 @@ impl FrameBuilder<'_> {
             queue.write_buffer(
                 instance_buffer,
                 0,
-                bytemuck::cast_slice(&instances.into_iter().map(|i| i.raw()).collect::<Vec<_>>()),
+                bytemuck::cast_slice(&instances.into_iter().map(|(_layer, i)| i.raw()).collect::<Vec<_>>()),
             );
         }
 
