@@ -25,7 +25,7 @@ def draw(renderer: wffle.Renderer, inputs):
 
     frame_counter += 1
     renderer.draw(2, [cos(6 * time.time()) + 1, 0.33 * sin(3 * time.time()) + 1], layer = 1)
-    renderer.draw(0, [0, 0], layer = 0)
+    renderer.draw(0, [0, 0], angle = 180 * (sin(time.time()) + 1) )
 
     renderer.draw(1, inputs.cursor_world_pos, layer=2)
     renderer.set_title(f"{frame_counter}, {inputs.cursor_window_pos}")

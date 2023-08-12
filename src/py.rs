@@ -5,7 +5,10 @@ use image::DynamicImage;
 use mint::Vector2;
 use pyo3::{buffer::PyBuffer, prelude::*, types::PyTuple};
 
-use crate::{SpriteIndex, SpriteInstance, StandaloneInputState, StandaloneRenderer, LayerIdentifier};
+use crate::{
+    LayerIdentifier, SpriteIndex, SpriteInstance, SpriteTransform, StandaloneInputState,
+    StandaloneRenderer,
+};
 
 /// Input transferred to the Python's world.
 #[pyclass(name = "Input", frozen, unsendable)]
@@ -45,7 +48,7 @@ pub struct PythonRenderer {
     new_title: OnceCell<String>,
 
     sprites_to_add: Vec<DynamicImage>,
-    to_draw_list: Vec<(SpriteIndex, Option<LayerIdentifier>, Vector2<f32>)>,
+    to_draw_list: Vec<(SpriteIndex, Option<LayerIdentifier>, SpriteInstance)>,
 
     last_sprite_index: SpriteIndex,
 }
@@ -110,14 +113,11 @@ impl PythonRenderer {
                 let mut frame_builder = renderer.begin_frame();
 
                 let draw_list = &mut self_borrow.to_draw_list;
-                for (draw_idx, layer, pos) in draw_list.iter() {
+                for (draw_idx, layer, instance) in draw_list.iter() {
                     frame_builder = frame_builder.draw_sprite_indexed(
                         *draw_idx,
                         layer.to_owned().unwrap_or_default(),
-                        SpriteInstance {
-                            position: *pos,
-                            ..Default::default()
-                        },
+                        *instance,
                     )
                 }
                 draw_list.clear();
@@ -171,9 +171,47 @@ impl PythonRenderer {
     }
 
     /// Add the sprite to the drawing queue
-    fn draw(&mut self, py: Python<'_>, index: SpriteIndex, at: PyObject, layer: Option<LayerIdentifier>) -> PyResult<()> {
-        self.to_draw_list
-            .push((index, layer, Vector2::from(at.extract::<[f32; 2]>(py)?)));
+    fn draw(
+        &mut self,
+        py: Python<'_>,
+        index: SpriteIndex,
+        at: PyObject,
+
+        layer: Option<LayerIdentifier>,
+        angle: Option<f32>,
+        color: Option<PyObject>,
+        scale: Option<PyObject>,
+        opacity: Option<f32>,
+    ) -> PyResult<()> {
+        let scale = match scale {
+            Some(py_obj) => match py_obj.extract::<[f32; 2]>(py) {
+                Err(_) => [py_obj.extract::<f32>(py)?; 2],
+                Ok(ok) => ok,
+            },
+            None => [1.; 2],
+        };
+
+        let color = match color {
+            None => [0xFF; 3],
+            Some(color) => match color.extract::<[u8; 3]>(py) {
+                Ok(arr) => arr,
+                Err(_) => color.extract::<[f32; 3]>(py)?.map(|x| (x * 255.) as u8),
+            },
+        };
+
+        self.to_draw_list.push((
+            index,
+            layer,
+            SpriteInstance {
+                position: Vector2::from(at.extract::<[f32; 2]>(py)?),
+                transform: SpriteTransform {
+                    scale: scale.into(),
+                    rotation_deg: angle.unwrap_or(0.),
+                },
+                color: color.into(),
+                opacity: opacity.unwrap_or(1.).clamp(0., 1.),
+            },
+        ));
         Ok(())
     }
 }

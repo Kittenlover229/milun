@@ -12,7 +12,11 @@ class Renderer:
         sprite_index: int,
         position: Tuple[float, float],
         *,
-        layer: Union[None, str, int] = None
+        layer: Union[str, int] = 0,
+        angle_in_degrees: 0.0,
+        color: Tuple[int, int, int] | Tuple[float, float, float] = (1.0, 1.0, 1.0),
+        scale: float | Tuple[float, float] = 1.0,
+        opacity: float = 1.0,
     ) -> None: ...
     def add_sprite(self, buffer: bytes) -> int: ...
 
