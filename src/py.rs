@@ -171,6 +171,7 @@ impl PythonRenderer {
     }
 
     /// Add the sprite to the drawing queue
+    #[allow(clippy::too_many_arguments)]
     fn draw(
         &mut self,
         py: Python<'_>,
