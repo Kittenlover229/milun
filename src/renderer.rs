@@ -10,8 +10,8 @@ use wgpu::{util::DeviceExt, Buffer, BufferDescriptor, BufferUsages};
 use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window};
 
 use crate::{
-    vertex::Vertex, AtlasBuilder, Camera, CameraRaw, RawSpriteInstance, SpriteDrawData,
-    SpriteIndex, SpriteInstance, LayerIdentifier,
+    vertex::Vertex, AtlasBuilder, Camera, CameraRaw, LayerIdentifier, RawSpriteInstance,
+    SpriteDrawData, SpriteIndex, SpriteInstance,
 };
 
 /// The main object used for drawing. Use `.atlas()` to load new sprites and
@@ -422,6 +422,13 @@ impl Renderer {
             });
         }
     }
+
+    pub(crate) fn resolve_layer_ord(&mut self, layer: &LayerIdentifier) -> i32 {
+        *match layer {
+            LayerIdentifier::Ordinal(c) => c,
+            LayerIdentifier::Named(name) => self.named_layers.get(name.as_ref()).unwrap_or(&0),
+        }
+    }
 }
 
 impl Renderer {
@@ -475,7 +482,8 @@ impl FrameBuilder<'_> {
         layer_id: impl Into<LayerIdentifier>,
         instance: impl Into<SpriteInstance>,
     ) -> Self {
-        self.draw_sprites.push((sprite_idx, (layer_id.into(), instance.into())));
+        self.draw_sprites
+            .push((sprite_idx, (layer_id.into(), instance.into())));
         self
     }
 
@@ -488,18 +496,31 @@ impl FrameBuilder<'_> {
     /// Finishes the frame and presents it onto the [`Renderer`]'s surface.
     pub fn end_frame(mut self) -> Result<(), wgpu::SurfaceError> {
         let output = self.renderer.surface.get_current_texture()?;
+        let sprite_to_draw_count = self.draw_sprites.len();
 
         let view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
         self.renderer
-            .reserve_instance_buffer_for(self.draw_sprites.len() as _);
+            .reserve_instance_buffer_for(sprite_to_draw_count as _);
 
         let mut encoder = self
             .renderer
             .device()
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+
+        self.draw_sprites.sort_by(
+            |(sprite_idx_lhs, (layer_lhs, _)), (sprite_idx_rhs, (layer_rhs, _))| {
+                let layer_lhs = self.renderer.resolve_layer_ord(layer_lhs);
+                let layer_rhs = self.renderer.resolve_layer_ord(layer_rhs);
+
+                match layer_lhs.cmp(&layer_rhs) {
+                    std::cmp::Ordering::Equal => sprite_idx_lhs.cmp(sprite_idx_rhs),
+                    x => x,
+                }
+            },
+        );
 
         let Renderer {
             queue,
@@ -519,16 +540,8 @@ impl FrameBuilder<'_> {
             #[cfg(feature = "egui")]
             config,
             clear_color,
-            named_layers,
             ..
         } = self.renderer;
-
-        self.draw_sprites.sort_by_key(|(_, (layer_id, _))| *match layer_id {
-            LayerIdentifier::Ordinal(c) => c,
-            LayerIdentifier::Named(named) => named_layers.get(named.as_ref()).to_owned().unwrap_or(&0),
-        });
-
-        let (sprite_indices, instances): (Vec<_>, Vec<_>) = self.draw_sprites.into_iter().unzip();
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -562,14 +575,45 @@ impl FrameBuilder<'_> {
             render_pass.set_bind_group(0, cold_bind_group, &[]);
             render_pass.set_bind_group(1, hot_bind_group, &[]);
 
-            for (i, sprite_idx) in sprite_indices.into_iter().enumerate() {
-                render_pass.draw_indexed(sprites[sprite_idx].indices(), 0, i as _..(i + 1) as _);
+            let instances = self.draw_sprites.into_iter().fold(
+                Vec::with_capacity(sprite_to_draw_count),
+                |mut instances, (sprite_idx, (_, instance))| {
+                    match instances.last_mut() {
+                        Some((current_sprite, _)) if *current_sprite != sprite_idx => {
+                            instances.push((sprite_idx, vec![instance]));
+                        }
+                        None => {
+                            instances.push((sprite_idx, vec![instance]));
+                        }
+                        Some((_, instances_of_this_sprite)) => {
+                            instances_of_this_sprite.push(instance);
+                        }
+                    };
+                    instances
+                },
+            );
+
+            let mut instances_processed = 0;
+            for (sprite_idx, instances) in instances.iter() {
+                render_pass.draw_indexed(
+                    sprites[*sprite_idx].indices(),
+                    0,
+                    instances_processed as _..(instances_processed + instances.len()) as _,
+                );
+
+                instances_processed += instances.len();
             }
 
             queue.write_buffer(
                 instance_buffer,
                 0,
-                bytemuck::cast_slice(&instances.into_iter().map(|(_layer, i)| i.raw()).collect::<Vec<_>>()),
+                bytemuck::cast_slice(
+                    &instances
+                        .into_iter()
+                        .flat_map(|(_, i)| i)
+                        .map(|i| i.raw())
+                        .collect::<Vec<_>>(),
+                ),
             );
         }
 

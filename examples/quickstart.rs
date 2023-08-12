@@ -55,6 +55,15 @@ fn main() {
                     },
                 )
                 .draw_sprite_indexed(
+                    i16x16,
+                    BACKGROUND,
+                    SpriteInstance {
+                        position: [1., 0.].into(),
+                        color: [0xFF, 0xFF, 0x00].into(),
+                        ..Default::default()
+                    },
+                )
+                .draw_sprite_indexed(
                     i8x16,
                     BACKGROUND,
                     SpriteInstance {
