@@ -28,7 +28,7 @@ fn main() {
             let frame = renderer.begin_frame();
 
             let frame = frame
-                .draw_sprite_indexed(
+                .draw_sprite(
                     i8x8,
                     BACKGROUND,
                     SpriteInstance {
@@ -36,38 +36,38 @@ fn main() {
                         ..Default::default()
                     },
                 )
-                .draw_sprite_indexed(
+                .draw_sprite(
                     i8x8,
                     FOREGROUND,
                     SpriteInstance {
-                        position: cursor_pos,
+                        position: [cursor_pos.x, cursor_pos.y, 0.].into(),
                         color: [0xFF, 0xFF, 0xFF].into(),
                         ..Default::default()
                     },
                 )
-                .draw_sprite_indexed(
+                .draw_sprite(
                     i16x16,
                     BACKGROUND,
                     SpriteInstance {
-                        position: [0., 1.].into(),
+                        position: [0., 1., 0.].into(),
                         color: [0xFF, 0xFF, 0x00].into(),
                         ..Default::default()
                     },
                 )
-                .draw_sprite_indexed(
+                .draw_sprite(
                     i16x16,
                     BACKGROUND,
                     SpriteInstance {
-                        position: [1., 0.].into(),
+                        position: [1., 0., 0.].into(),
                         color: [0xFF, 0xFF, 0x00].into(),
                         ..Default::default()
                     },
                 )
-                .draw_sprite_indexed(
+                .draw_sprite(
                     i8x16,
                     BACKGROUND,
                     SpriteInstance {
-                        position: [0., 2.].into(),
+                        position: [0., 2., 0.].into(),
                         opacity: 0.5,
                         ..Default::default()
                     },

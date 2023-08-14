@@ -476,7 +476,7 @@ impl FrameBuilder<'_> {
     /// All the sprites are considered non-premultiplied by default.
     /// If the sprite you are drawing is premultiplied, specify that option in
     /// the [`AtlasBuilder`] using the [`SpriteLoadOptions`].
-    pub fn draw_sprite_indexed(
+    pub fn draw_sprite(
         mut self,
         sprite_idx: SpriteIndex,
         layer_id: impl Into<LayerIdentifier>,

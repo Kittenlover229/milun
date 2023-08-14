@@ -1,6 +1,6 @@
 use bytemuck::{Pod, Zeroable};
 use cint::EncodedSrgb;
-use mint::Vector2;
+use mint::{Vector2, Vector3};
 
 /// Defined the rotation and the scale of the sprite.
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -47,7 +47,7 @@ impl Default for SpriteTransform {
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct SpriteInstance {
     /// The world position of the sprite's center.
-    pub position: Vector2<f32>,
+    pub position: Vector3<f32>,
     pub transform: SpriteTransform,
     /// RGB components of the sprite's colour.
     pub color: EncodedSrgb<u8>,
@@ -60,7 +60,7 @@ pub struct SpriteInstance {
 impl Default for SpriteInstance {
     fn default() -> Self {
         Self {
-            position: [0.; 2].into(),
+            position: [0.; 3].into(),
             transform: Default::default(),
             color: [0xFFu8; 3].into(),
             opacity: 1.,
@@ -71,7 +71,7 @@ impl Default for SpriteInstance {
 #[derive(Debug, PartialEq, Clone, Copy, Default, Zeroable, Pod)]
 #[repr(C)]
 pub(crate) struct RawSpriteInstance {
-    pub(crate) position: [f32; 2],
+    pub(crate) position: [f32; 3],
     pub(crate) scale: [f32; 2],
     pub(crate) rotation_rad: f32,
     pub(crate) color: [f32; 4],
@@ -108,20 +108,20 @@ impl SpriteInstance {
                 wgpu::VertexAttribute {
                     offset: 0,
                     shader_location: 2,
-                    format: wgpu::VertexFormat::Float32x2,
+                    format: wgpu::VertexFormat::Float32x3,
                 },
                 wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 2]>() as _,
+                    offset: std::mem::size_of::<[f32; 3]>() as _,
                     shader_location: 3,
                     format: wgpu::VertexFormat::Float32x2,
                 },
                 wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 4]>() as _,
+                    offset: std::mem::size_of::<[f32; 5]>() as _,
                     shader_location: 4,
                     format: wgpu::VertexFormat::Float32,
                 },
                 wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 5]>() as _,
+                    offset: std::mem::size_of::<[f32; 6]>() as _,
                     shader_location: 5,
                     format: wgpu::VertexFormat::Float32x4,
                 },

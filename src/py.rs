@@ -2,7 +2,7 @@ use std::cell::OnceCell;
 
 use cint::EncodedSrgb;
 use image::DynamicImage;
-use mint::Vector2;
+use mint::{Vector2, Vector3};
 use pyo3::{buffer::PyBuffer, prelude::*, types::PyTuple};
 
 use crate::{
@@ -114,7 +114,7 @@ impl PythonRenderer {
 
                 let draw_list = &mut self_borrow.to_draw_list;
                 for (draw_idx, layer, instance) in draw_list.iter() {
-                    frame_builder = frame_builder.draw_sprite_indexed(
+                    frame_builder = frame_builder.draw_sprite(
                         *draw_idx,
                         layer.to_owned().unwrap_or_default(),
                         *instance,
@@ -176,7 +176,7 @@ impl PythonRenderer {
         &mut self,
         py: Python<'_>,
         index: SpriteIndex,
-        at: PyObject,
+        position: PyObject,
 
         layer: Option<LayerIdentifier>,
         angle: Option<f32>,
@@ -200,11 +200,19 @@ impl PythonRenderer {
             },
         };
 
+        let position = match position.extract::<[f32; 3]>(py).ok() {
+            Some(some) => some,
+            None => {
+                let [x, y] = position.extract::<[f32; 2]>(py)?;
+                [x, y, 0.]
+            }
+        };
+
         self.to_draw_list.push((
             index,
             layer,
             SpriteInstance {
-                position: Vector2::from(at.extract::<[f32; 2]>(py)?),
+                position: Vector3::from(position),
                 transform: SpriteTransform {
                     scale: scale.into(),
                     rotation_deg: angle.unwrap_or(0.),
