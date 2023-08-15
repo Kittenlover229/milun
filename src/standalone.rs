@@ -14,7 +14,7 @@ use winit::{
 
 use crate::{FrameBuilder, Renderer};
 
-/// Standalone renderer that instead of taking ownership of an existing window creates it's own.
+/// Standalone renderer that instead of taking ownership of an existing window creates its own.
 pub struct StandaloneRenderer {
     /// Main renderer in control of the window.
     pub renderer: Renderer,

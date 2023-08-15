@@ -4,6 +4,9 @@ version = "0.0.0"
 edition = "2021"
 resolver = "2"
 
+[lib]
+crate-type = ["staticlib", "cdylib", "lib"] 
+
 [dependencies]
 wgpu = { version = "0.16", features = ["trace", "webgl"] }
 image = { version = "0.24", default-features = false, features = ["png", "jpeg"] }
@@ -17,6 +20,9 @@ egui-wgpu = { version = "^0.22", features = ["winit"], optional = true }
 egui-winit = { version = "^0.22", optional = true }
 egui = { version = "^0.22", features = ["cint", "mint", "extra_debug_asserts"], optional = true }
 pyo3 = { version = "0.19.2", features = ["hashbrown", "extension-module"], optional = true }
+
+[build-dependencies]
+cbindgen = "0.24.5"
 
 [features]
 sync-new = ["dep:pollster"]

@@ -5,6 +5,7 @@
 #![feature(generic_const_exprs)]
 #![feature(iter_from_generator)]
 #![feature(arbitrary_self_types)]
+#![feature(c_size_t)]
 
 mod atlas;
 mod camera;
@@ -20,6 +21,8 @@ mod sprite;
 #[cfg(feature = "standalone")]
 mod standalone;
 mod vertex;
+#[cfg(feature = "standalone")]
+mod c;
 
 pub use atlas::*;
 pub use camera::*;
