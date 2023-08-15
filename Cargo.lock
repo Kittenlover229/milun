@@ -1583,6 +1583,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "tangerine"
+version = "0.0.0"
+dependencies = [
+ "bytemuck",
+ "cint",
+ "egui",
+ "egui-wgpu",
+ "egui-winit",
+ "hashbrown 0.14.0",
+ "image",
+ "mint",
+ "pollster",
+ "pyo3",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
 name = "target-lexicon"
 version = "0.12.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1931,24 +1949,6 @@ dependencies = [
  "raw-window-handle",
  "url",
  "web-sys",
-]
-
-[[package]]
-name = "wffle"
-version = "0.0.0"
-dependencies = [
- "bytemuck",
- "cint",
- "egui",
- "egui-wgpu",
- "egui-winit",
- "hashbrown 0.14.0",
- "image",
- "mint",
- "pollster",
- "pyo3",
- "wgpu",
- "winit",
 ]
 
 [[package]]

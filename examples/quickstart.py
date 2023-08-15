@@ -1,10 +1,10 @@
-import wffle
+import tangerine
 import time
 from math import sin, cos
 
 frame_counter = 0
 
-renderer = wffle.Renderer()
+renderer = tangerine.Renderer()
 
 begin = time.perf_counter()
 renderer.set_background_color(None)
@@ -16,7 +16,7 @@ sett = False
 sprite16x16 = 0
 
 @renderer.run
-def draw(renderer: wffle.Renderer, inputs):
+def draw(renderer: tangerine.Renderer, inputs):
     global frame_counter, sett, sprite16x16
     
     if not sett:

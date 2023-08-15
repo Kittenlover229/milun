@@ -1,13 +1,12 @@
 use std::convert::Infallible;
 
-use wffle::{SpriteInstance, StandaloneRenderer};
+use tangerine::{SpriteInstance, StandaloneRenderer};
 
 const BACKGROUND: &str = "background";
 const FOREGROUND: &str = "foreground";
 
 fn main() {
-    let mut renderer = StandaloneRenderer::new("Wffle Quickstart Example");
-    renderer.egui_integration.consume_captured_inputs = false;
+    let mut renderer = StandaloneRenderer::new("Tangerine Quickstart Example");
     renderer.set_layer(BACKGROUND, 0);
     renderer.set_layer(FOREGROUND, 5);
 
@@ -71,12 +70,7 @@ fn main() {
                         opacity: 0.5,
                         ..Default::default()
                     },
-                )
-                .draw_egui(|ctx| {
-                    egui::Window::new("Demo Egui Window").show(ctx, |ui| {
-                        ui.label("Hello, world!");
-                    });
-                });
+                );
 
             Ok(frame)
         })

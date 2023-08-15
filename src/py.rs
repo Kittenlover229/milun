@@ -226,7 +226,7 @@ impl PythonRenderer {
 }
 
 #[pymodule]
-fn wffle(_py: Python<'_>, module: &PyModule) -> PyResult<()> {
+fn tangerine(_py: Python<'_>, module: &PyModule) -> PyResult<()> {
     module.add_class::<PythonRenderer>()?;
     module.add_class::<PythonInput>()?;
     Ok(())

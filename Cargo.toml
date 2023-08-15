@@ -1,5 +1,5 @@
 [package]
-name = "wffle"
+name = "tangerine"
 version = "0.0.0"
 edition = "2021"
 resolver = "2"
@@ -18,10 +18,9 @@ egui-winit = { version = "^0.22", optional = true }
 egui = { version = "^0.22", features = ["cint", "mint", "extra_debug_asserts"], optional = true }
 pyo3 = { version = "0.19.2", features = ["hashbrown", "extension-module"], optional = true }
 
-
 [features]
 sync-new = ["dep:pollster"]
 standalone = ["sync-new"]
 egui = ["dep:egui", "dep:egui-winit", "dep:egui-wgpu"]
 py = ["standalone", "dep:pyo3"]
-default = ["standalone", "egui", "py"]
+default = ["standalone"]

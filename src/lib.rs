@@ -8,23 +8,23 @@
 
 mod atlas;
 mod camera;
-mod packing;
-mod instance;
-mod renderer;
-mod sprite;
-mod vertex;
-mod layer;
 #[cfg(feature = "egui")]
 mod egui;
-#[cfg(feature = "standalone")]
-mod standalone;
+mod instance;
+mod layer;
+mod packing;
 #[cfg(feature = "py")]
 mod py;
+mod renderer;
+mod sprite;
+#[cfg(feature = "standalone")]
+mod standalone;
+mod vertex;
 
 pub use atlas::*;
-pub use layer::*;
 pub use camera::*;
 pub use instance::*;
+pub use layer::*;
 pub use renderer::*;
 pub use sprite::*;
 
