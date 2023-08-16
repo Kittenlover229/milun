@@ -1,5 +1,0 @@
-language = "C"
-
-[export.rename]
-"c_size_t" = "size_t"
-"StandaloneRenderer" = "tangerine_renderer"

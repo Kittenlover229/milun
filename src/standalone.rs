@@ -24,6 +24,7 @@ pub struct StandaloneRenderer {
 
 /// All the input gathered by the [`StandaloneRenderer`] since last frame.
 #[derive(Debug, Clone, Copy, Hash)]
+#[repr(C)]
 pub struct StandaloneInputState {
     /// Last recorded position of the cursor in window space.
     pub cursor_pos: Vector2<u32>,
