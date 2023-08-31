@@ -10,9 +10,9 @@ fn main() {
     renderer.set_layer(BACKGROUND, 0);
     renderer.set_layer(FOREGROUND, 5);
 
-    let texture_16x16 = image::load_from_memory(include_bytes!("16x16.png")).unwrap();
-    let texture_8x16 = image::load_from_memory(include_bytes!("8x16.png")).unwrap();
-    let texture_8x8 = image::load_from_memory(include_bytes!("8x8.png")).unwrap();
+    let texture_16x16 = image::load_from_memory(include_bytes!("./assets/16x16.png")).unwrap();
+    let texture_8x16 = image::load_from_memory(include_bytes!("./assets/8x16.png")).unwrap();
+    let texture_8x8 = image::load_from_memory(include_bytes!("./assets/8x8.png")).unwrap();
 
     let [i16x16, i8x16, i8x8] = renderer
         .atlas()

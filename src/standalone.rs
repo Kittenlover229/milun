@@ -1,7 +1,7 @@
 use std::{
     cell::OnceCell,
     error::Error,
-    ops::{Deref, DerefMut},
+    ops::{Deref, DerefMut}, convert::Infallible,
 };
 
 use mint::Vector2;
@@ -54,13 +54,12 @@ impl StandaloneRenderer {
     }
 }
 
+pub trait StandaloneDrawCallback<E: Error = Infallible> =
+    FnMut(&mut Renderer, StandaloneInputState) -> Result<FrameBuilder<'_>, E>;
+
 impl StandaloneRenderer {
     /// Run the event loop until an error is encountered, close request is received or `Esc` is pressed.
-    pub fn run<E: Error>(
-        self,
-        mut draw_callback: impl FnMut(&mut Renderer, StandaloneInputState) -> Result<FrameBuilder<'_>, E>
-            + 'static,
-    ) -> Result<(), E> {
+    pub fn run<E: Error>(self, mut draw_callback: impl StandaloneDrawCallback<E> + 'static) -> Result<(), E> {
         let StandaloneRenderer {
             mut event_loop,
             mut renderer,

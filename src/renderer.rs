@@ -626,4 +626,8 @@ impl FrameBuilder<'_> {
 
         Ok(())
     }
+
+    pub fn renderer(&mut self) -> &mut Renderer {
+        self.renderer
+    } 
 }

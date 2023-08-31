@@ -9,8 +9,8 @@ renderer = tangerine.Renderer()
 begin = time.perf_counter()
 renderer.set_background_color(None)
 
-sprite8x8 = renderer.add_sprite(open("examples/8x8.png", "rb").read())
-sprite8x16 = renderer.add_sprite(open("examples/8x16.png", "rb").read())
+sprite8x8 = renderer.add_sprite(open("examples/assets/8x8.png", "rb").read())
+sprite8x16 = renderer.add_sprite(open("examples/assets/8x16.png", "rb").read())
 
 sett = False
 sprite16x16 = 0
