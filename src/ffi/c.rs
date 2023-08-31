@@ -50,6 +50,6 @@ unsafe extern "C" fn tangerine_run(
 ) {
     let _ = std::ptr::read(renderer).run::<Infallible>(move |_, input| {
         callback(renderer, input);
-        Ok((&mut *renderer).begin_frame())
+        Ok(())
     });
 }

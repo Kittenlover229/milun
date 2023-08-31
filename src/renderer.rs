@@ -1,3 +1,6 @@
+use std::cell::OnceCell;
+
+use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use cint::EncodedSrgb;
 
 #[cfg(feature = "egui")]
@@ -70,6 +73,12 @@ pub struct Renderer {
     pub(crate) vertex_buffer: Buffer,
     /// Indices into the vertex buffer
     pub(crate) index_buffer: Buffer,
+
+    /*** Timers ***/
+    /// The timestamp of the first rendered frame
+    pub(crate) first_render_ts: OnceCell<NaiveDateTime>,
+    pub(crate) last_render_ts: Option<NaiveDateTime>,
+    pub(crate) delta_time: Duration,
 
     /*** EGUI Integration ***/
     #[cfg(feature = "egui")]
@@ -319,6 +328,10 @@ impl Renderer {
             config,
             render_pipeline,
             named_layers: [].into(),
+
+            first_render_ts: OnceCell::new(),
+            last_render_ts: None,
+            delta_time: Duration::zero(),
         }
     }
 }
@@ -447,6 +460,10 @@ impl Renderer {
     pub fn size(&self) -> PhysicalSize<u32> {
         self.size
     }
+
+    pub fn camera(&self) -> &Camera {
+        &self.camera
+    }
 }
 
 /// Used for adding draw data to a frame of a [`Renderer`].
@@ -477,11 +494,11 @@ impl FrameBuilder<'_> {
     /// If the sprite you are drawing is premultiplied, specify that option in
     /// the [`AtlasBuilder`] using the [`SpriteLoadOptions`].
     pub fn draw_sprite(
-        mut self,
+        &mut self,
         sprite_idx: SpriteIndex,
         layer_id: impl Into<LayerIdentifier>,
         instance: impl Into<SpriteInstance>,
-    ) -> Self {
+    ) -> &mut Self {
         self.draw_sprites
             .push((sprite_idx, (layer_id.into(), instance.into())));
         self
@@ -497,6 +514,13 @@ impl FrameBuilder<'_> {
     pub fn end_frame(mut self) -> Result<(), wgpu::SurfaceError> {
         let output = self.renderer.surface.get_current_texture()?;
         let sprite_to_draw_count = self.draw_sprites.len();
+
+        let now = Utc::now().naive_utc();
+        self.renderer.first_render_ts.get_or_init(|| now);
+        if let Some(last_ts) = self.renderer.last_render_ts {
+            self.renderer.delta_time = now - last_ts;
+        }
+        self.renderer.last_render_ts = Some(now);
 
         let view = output
             .texture
@@ -627,7 +651,9 @@ impl FrameBuilder<'_> {
         Ok(())
     }
 
+    pub fn done(&mut self) {}
+
     pub fn renderer(&mut self) -> &mut Renderer {
         self.renderer
-    } 
+    }
 }

@@ -22,11 +22,10 @@ fn main() {
         .finalize_and_repack();
 
     renderer
-        .run::<Infallible>(move |renderer, input| {
-            let cursor_pos = renderer.window_to_world(input.cursor_pos);
-            let frame = renderer.begin_frame();
+        .run::<Infallible>(move |frame, input| {
+            let cursor_pos = frame.renderer().window_to_world(input.cursor_pos);
 
-            let frame = frame
+            frame
                 .draw_sprite(
                     i8x8,
                     BACKGROUND,
@@ -70,9 +69,10 @@ fn main() {
                         opacity: 0.5,
                         ..Default::default()
                     },
-                );
+                )
+                .done();
 
-            Ok(frame)
+            Ok(())
         })
         .unwrap();
 }

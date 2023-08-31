@@ -1,12 +1,15 @@
 use std::{
     cell::OnceCell,
+    convert::Infallible,
     error::Error,
-    ops::{Deref, DerefMut}, convert::Infallible,
+    ops::{Deref, DerefMut},
 };
 
+use hashbrown::HashSet;
 use mint::Vector2;
+use smallvec::{smallvec, SmallVec};
 use winit::{
-    event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
+    event::{ElementState, Event, KeyboardInput, ScanCode, VirtualKeyCode, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     platform::run_return::EventLoopExtRunReturn,
     window::WindowBuilder,
@@ -20,20 +23,31 @@ pub struct StandaloneRenderer {
     pub renderer: Renderer,
     /// Event loop in which the `.run(..)` function is ran.
     pub event_loop: EventLoop<()>,
+
+    keys_pressed: HashSet<VirtualKeyCode>,
 }
 
 /// All the input gathered by the [`StandaloneRenderer`] since last frame.
-#[derive(Debug, Clone, Copy, Hash)]
+#[derive(Debug, Clone)]
 #[repr(C)]
 pub struct StandaloneInputState {
     /// Last recorded position of the cursor in window space.
     pub cursor_pos: Vector2<u32>,
+    /// The amount of time since the last render (in seconds).
+    pub delta_time_secs: f32,
+    /// All the keys that were pressed since last frame.
+    pub pressed_keys: SmallVec<[(ScanCode, VirtualKeyCode); 4]>,
+    /// All the keys that were released since last frame.
+    pub released_keys: SmallVec<[(ScanCode, VirtualKeyCode); 4]>,
 }
 
 impl Default for StandaloneInputState {
     fn default() -> Self {
         Self {
             cursor_pos: [0; 2].into(),
+            delta_time_secs: 0.,
+            pressed_keys: smallvec![],
+            released_keys: smallvec![],
         }
     }
 }
@@ -50,24 +64,32 @@ impl StandaloneRenderer {
         Self {
             renderer: Renderer::from(window),
             event_loop,
+            keys_pressed: Default::default(),
         }
     }
 }
 
 pub trait StandaloneDrawCallback<E: Error = Infallible> =
-    FnMut(&mut Renderer, StandaloneInputState) -> Result<FrameBuilder<'_>, E>;
+    for<'a, 'b> FnMut(&'b mut FrameBuilder<'a>, &StandaloneInputState) -> Result<(), E>;
 
 impl StandaloneRenderer {
     /// Run the event loop until an error is encountered, close request is received or `Esc` is pressed.
-    pub fn run<E: Error>(self, mut draw_callback: impl StandaloneDrawCallback<E> + 'static) -> Result<(), E> {
+    pub fn run<E: Error>(
+        self,
+        mut draw_callback: impl StandaloneDrawCallback<E> + 'static,
+    ) -> Result<(), E> {
         let StandaloneRenderer {
             mut event_loop,
             mut renderer,
+            mut keys_pressed,
             ..
         } = self;
 
         let mut gathered_input = StandaloneInputState {
             cursor_pos: [0; 2].into(),
+            delta_time_secs: 0.,
+            pressed_keys: smallvec![],
+            released_keys: smallvec![],
         };
 
         let mut error_return: OnceCell<E> = Default::default();
@@ -83,16 +105,27 @@ impl StandaloneRenderer {
                     } if window_id == window.id() => {
                         if !renderer.input(event) {
                             match event {
-                                WindowEvent::CloseRequested
-                                | WindowEvent::KeyboardInput {
+                                WindowEvent::KeyboardInput {
                                     input:
                                         KeyboardInput {
-                                            state: ElementState::Pressed,
-                                            virtual_keycode: Some(VirtualKeyCode::Escape),
+                                            scancode,
+                                            state,
+                                            virtual_keycode: Some(keycode),
                                             ..
                                         },
                                     ..
-                                } => *control_flow = ControlFlow::Exit,
+                                } => match state {
+                                    ElementState::Pressed if !keys_pressed.contains(keycode) => {
+                                        gathered_input.pressed_keys.push((*scancode, *keycode));
+                                        keys_pressed.insert(*keycode);
+                                    }
+                                    ElementState::Released => {
+                                        gathered_input.released_keys.push((*scancode, *keycode));
+                                        keys_pressed.remove(keycode);
+                                    }
+                                    _ => {}
+                                },
+                                WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                                 WindowEvent::CursorMoved { position, .. } => {
                                     gathered_input.cursor_pos =
                                         [position.x as u32, position.y as u32].into();
@@ -103,16 +136,29 @@ impl StandaloneRenderer {
                     }
 
                     Event::RedrawRequested(window_id) if window_id == renderer.window().id() => {
-                        let draw_result = match draw_callback(&mut renderer, gathered_input) {
-                            Ok(res) => res,
+                        gathered_input.delta_time_secs = renderer
+                            .delta_time
+                            .to_owned()
+                            .num_nanoseconds()
+                            .unwrap_or_default()
+                            as f32
+                            * (10e-9);
+
+                        let mut frame_builder = renderer.begin_frame();
+
+                        match draw_callback(&mut frame_builder, &gathered_input) {
                             Err(err) => {
                                 *error_return = err.into();
                                 *control_flow = ControlFlow::Exit;
                                 return;
                             }
+                            _ => {}
                         };
 
-                        match draw_result.end_frame() {
+                        gathered_input.pressed_keys.clear();
+                        gathered_input.released_keys.clear();
+
+                        match frame_builder.end_frame() {
                             Ok(_) => {}
                             Err(wgpu::SurfaceError::Lost) => renderer.resize(renderer.size()),
                             Err(wgpu::SurfaceError::OutOfMemory) => {
