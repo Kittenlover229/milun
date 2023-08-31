@@ -1,6 +1,6 @@
 use std::cell::OnceCell;
 
-use chrono::{DateTime, Duration, NaiveDateTime, Utc};
+use chrono::{Duration, NaiveDateTime, Utc};
 use cint::EncodedSrgb;
 
 #[cfg(feature = "egui")]

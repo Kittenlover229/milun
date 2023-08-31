@@ -16,13 +16,13 @@ struct Asteroid {
     pub position: Vector2<f32>,
     pub velocity: Vector2<f32>,
     pub size: f32,
-
     pub rotor: f32,
 }
 
 struct Player {
     pub drag: f32,
     pub wish: Vector2<i8>,
+    pub velocity: Vector2<f32>,
     pub position: Vector2<f32>,
 }
 
@@ -120,6 +120,7 @@ pub fn make_draw_callback(
         drag: 0.7,
         position: [0.; 2].into(),
         wish: [0; 2].into(),
+        velocity: [0.; 2].into(),
     };
 
     move |frame: &mut FrameBuilder, input: &StandaloneInputState| {
@@ -141,8 +142,7 @@ pub fn make_draw_callback(
         if input
             .pressed_keys
             .iter()
-            .find(|(_, keycode)| matches!(keycode, VirtualKeyCode::Space))
-            .is_some()
+            .any(|(_, keycode)| matches!(keycode, VirtualKeyCode::Space))
         {
             projectiles.push(Projectile {
                 position: player.position,
@@ -156,42 +156,105 @@ pub fn make_draw_callback(
         if wish_len != 0. {
             wish_x /= wish_len;
             wish_y /= wish_len;
-            player.position.x += wish_x * dt;
-            player.position.y += wish_y * dt;
+            player.velocity.x += wish_x * dt;
+            player.velocity.y += wish_y * dt;
+            let len = (player.velocity.x * player.velocity.x + player.velocity.y * player.velocity.y).sqrt();
+            if len > 1. {
+                player.velocity.x /= len;
+                player.velocity.y /= len;
+            }
+        } else {
+            player.velocity.x *= player.drag.powf(dt);
+            player.velocity.y *= player.drag.powf(dt);
         }
 
-        for projectile in projectiles.iter_mut() {
-            projectile.position.x += projectile.velocity.x * dt;
-            projectile.position.y += projectile.velocity.y * dt;
+        player.position.x += player.velocity.x * dt;
+        player.position.y += player.velocity.y * dt;
+
+        let mut asteroids_to_remove = vec![];
+
+        for Projectile {
+            position, velocity, ..
+        } in projectiles.iter_mut()
+        {
+            position.x += velocity.x * dt;
+            position.y += velocity.y * dt;
 
             frame.draw_sprite(
                 projectile_sprite,
                 FOREGROUND,
                 SpriteInstance {
-                    position: [projectile.position.x, projectile.position.y, 0.].into(),
+                    position: [position.x, position.y, 0.].into(),
                     ..Default::default()
                 },
             );
+
+            for (
+                i,
+                Asteroid {
+                    position: asteroid_pos,
+                    size,
+                    ..
+                },
+            ) in asteroids.iter().enumerate()
+            {
+                let dx = position.x - asteroid_pos.x;
+                let dy = position.y - asteroid_pos.y;
+
+                let distance = (dx * dx + dy * dy).sqrt();
+                if distance <= *size {
+                    asteroids_to_remove.push(i);
+                }
+            }
         }
 
-        for asteroid in asteroids.iter_mut() {
-            asteroid.position.x += asteroid.velocity.x * dt;
-            asteroid.position.y += asteroid.velocity.y * dt;
+        for (removed_count, i) in asteroids_to_remove.into_iter().enumerate() {
+            let Asteroid {
+                position,
+                size,
+                rotor,
+                ..
+            } = asteroids.remove(i - removed_count);
 
-            asteroid.position =
-                rect_wrap(asteroid.position, size, size * aspect_ratio, asteroid.size);
+            if size > 1. {
+                asteroids.push(Asteroid {
+                    position,
+                    velocity: [(rotor + angle).sin(), (rotor + angle).cos()].into(),
+                    size: size - 1.,
+                    rotor: rotor / 2.,
+                });
 
-            asteroid.rotor += dt * size;
+                asteroids.push(Asteroid {
+                    position,
+                    velocity: [(rotor - angle).sin(), (rotor - angle).cos()].into(),
+                    size: size - 1.,
+                    rotor: rotor * 2. + 170.,
+                });
+            }
+        }
+
+        for Asteroid {
+            position,
+            velocity,
+            size: asteroid_size,
+            rotor,
+        } in asteroids.iter_mut()
+        {
+            position.x += velocity.x * dt;
+            position.y += velocity.y * dt;
+
+            *position = rect_wrap(*position, size, size * aspect_ratio, *asteroid_size);
+
+            *rotor += dt * size;
 
             frame.draw_sprite(
                 asteroid_sprite,
                 FOREGROUND,
                 SpriteInstance {
-                    position: [asteroid.position.x, asteroid.position.y, 0.].into(),
+                    position: [position.x, position.y, 0.].into(),
                     transform: SpriteTransform {
-                        scale: [asteroid.size; 2].into(),
-                        rotation_deg: ROCK_SPINOR * asteroid.rotor / 180. * PI,
-                        ..Default::default()
+                        scale: [asteroid_size.sqrt(); 2].into(),
+                        rotation_deg: ROCK_SPINOR * *rotor / 180. * PI,
                     },
                     ..Default::default()
                 },
