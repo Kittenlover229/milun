@@ -75,8 +75,8 @@ impl<'me, const N: usize> AtlasBuilder<'me, N> {
         let mut sprites = vec![];
 
         for (pos, idx) in sprites_to_put.iter() {
-            let sprite = &mut self.rgba[*idx];
-            for (row, new_row) in buffer.rows_mut().skip(pos.y as _).zip(sprite.rows_mut()) {
+            let sprite = &self.rgba[*idx];
+            for (row, new_row) in buffer.rows_mut().skip(pos.y as _).zip(sprite.rows()) {
                 for (pixel, new_color) in row.skip(pos.x as _).zip(new_row) {
                     *pixel = *new_color;
                 }
@@ -251,7 +251,7 @@ impl<'me, const N: usize> AtlasBuilder<'me, N> {
         } = self;
 
         let SpriteLoadOptions { premultiplied, .. } = options.into();
-        let mut rgba32f = image.into().to_rgb32f();
+        let mut rgba32f = image.into().to_rgba32f();
 
         if premultiplied {
             for [r, g, b, a] in rgba32f.iter_mut().array_chunks::<4>() {

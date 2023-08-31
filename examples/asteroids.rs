@@ -9,6 +9,7 @@ use winit::event::{ScanCode, VirtualKeyCode};
 
 const BACKGROUND: &str = "background";
 const FOREGROUND: &str = "foreground";
+const PROJECTILE_SPEED: f32 = 2.;
 
 pub const ROCK_SPINOR: f32 = 18.;
 
@@ -117,7 +118,7 @@ pub fn make_draw_callback(
     let mut projectiles: Vec<Projectile> = vec![];
 
     let mut player = Player {
-        drag: 0.7,
+        drag: 0.99,
         position: [0.; 2].into(),
         wish: [0; 2].into(),
         velocity: [0.; 2].into(),
@@ -158,14 +159,16 @@ pub fn make_draw_callback(
             wish_y /= wish_len;
             player.velocity.x += wish_x * dt;
             player.velocity.y += wish_y * dt;
-            let len = (player.velocity.x * player.velocity.x + player.velocity.y * player.velocity.y).sqrt();
+            let len = (player.velocity.x * player.velocity.x
+                + player.velocity.y * player.velocity.y)
+                .sqrt();
             if len > 1. {
                 player.velocity.x /= len;
                 player.velocity.y /= len;
             }
         } else {
-            player.velocity.x *= player.drag.powf(dt);
-            player.velocity.y *= player.drag.powf(dt);
+            player.velocity.x *= player.drag.powf(1. - dt);
+            player.velocity.y *= player.drag.powf(1. - dt);
         }
 
         player.position.x += player.velocity.x * dt;
@@ -177,14 +180,15 @@ pub fn make_draw_callback(
             position, velocity, ..
         } in projectiles.iter_mut()
         {
-            position.x += velocity.x * dt;
-            position.y += velocity.y * dt;
+            position.x += velocity.x * dt * PROJECTILE_SPEED;
+            position.y += velocity.y * dt * PROJECTILE_SPEED;
 
             frame.draw_sprite(
                 projectile_sprite,
                 FOREGROUND,
                 SpriteInstance {
                     position: [position.x, position.y, 0.].into(),
+                    transform: SpriteTransform::size(0.5),
                     ..Default::default()
                 },
             );
@@ -253,7 +257,7 @@ pub fn make_draw_callback(
                 SpriteInstance {
                     position: [position.x, position.y, 0.].into(),
                     transform: SpriteTransform {
-                        scale: [asteroid_size.sqrt(); 2].into(),
+                        scale: [*asteroid_size; 2].into(),
                         rotation_deg: ROCK_SPINOR * *rotor / 180. * PI,
                     },
                     ..Default::default()
@@ -267,10 +271,7 @@ pub fn make_draw_callback(
             SpriteInstance {
                 position: [cursor_pos.x, cursor_pos.y, 0.].into(),
                 opacity: 0.333,
-                transform: SpriteTransform {
-                    scale: [0.5; 2].into(),
-                    ..Default::default()
-                },
+                transform: SpriteTransform::size(0.5),
                 ..Default::default()
             },
         );
@@ -282,10 +283,7 @@ pub fn make_draw_callback(
             FOREGROUND,
             SpriteInstance {
                 position: [player.position.x, player.position.y, 0.].into(),
-                transform: SpriteTransform {
-                    rotation_deg: 180. * angle / PI,
-                    ..Default::default()
-                },
+                transform: SpriteTransform::rotated_rad(angle + PI),
                 ..Default::default()
             },
         );
@@ -297,10 +295,13 @@ pub fn make_draw_callback(
 fn main() {
     let mut renderer = StandaloneRenderer::new("Tangerine Asteroids");
 
-    let asteroid_texture = image::load_from_memory(include_bytes!("./assets/16x16.png")).unwrap();
-    let spaceship_texture = image::load_from_memory(include_bytes!("./assets/8x8.png")).unwrap();
-    let cursor_texture = image::load_from_memory(include_bytes!("./assets/8x8.png")).unwrap();
-    let projectile_texture = image::load_from_memory(include_bytes!("./assets/8x8.png")).unwrap();
+    let asteroid_texture =
+        image::load_from_memory(include_bytes!("./assets/asteroid.png")).unwrap();
+    let spaceship_texture =
+        image::load_from_memory(include_bytes!("./assets/spaceship.png")).unwrap();
+    let cursor_texture = image::load_from_memory(include_bytes!("./assets/cursor.png")).unwrap();
+    let projectile_texture =
+        image::load_from_memory(include_bytes!("./assets/projectile.png")).unwrap();
 
     let [asteroid_sprite, spaceship_sprite, cursor_sprite, projectile_sprite] = renderer
         .atlas()

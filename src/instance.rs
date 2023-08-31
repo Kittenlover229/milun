@@ -12,6 +12,10 @@ pub struct SpriteTransform {
 }
 
 impl SpriteTransform {
+    pub fn size(size: impl Into<f32>) -> Self {
+        Self::scaled([size.into(); 2])
+    }
+
     pub fn scaled(scale: impl Into<Vector2<f32>>) -> Self {
         Self {
             scale: scale.into(),
