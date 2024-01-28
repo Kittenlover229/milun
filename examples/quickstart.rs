@@ -1,6 +1,6 @@
 use tangerine::{SpriteInstance, StandaloneRenderer};
 
-const BACKGROUND: &str = "Some(BACKGROUND)";
+const BACKGROUND: &str = "background";
 const FOREGROUND: &str = "foreground";
 
 fn main() {
