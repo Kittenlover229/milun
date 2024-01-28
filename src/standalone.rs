@@ -20,10 +20,10 @@ use crate::{FrameBuilder, Renderer};
 /// Standalone renderer that instead of taking ownership of an existing window creates its own.
 pub struct StandaloneRenderer {
     /// Main renderer in control of the window.
-    pub renderer: Renderer,
+    renderer: Renderer,
     /// Event loop in which the `.run(..)` function is ran.
-    pub event_loop: EventLoop<()>,
-
+    event_loop: EventLoop<()>,
+    /// Map of the active states of all currently pressed keys
     keys_pressed: HashSet<VirtualKeyCode>,
 }
 
@@ -72,8 +72,16 @@ impl StandaloneRenderer {
 pub trait StandaloneDrawCallback<E: Error = Infallible> =
     for<'a, 'b> FnMut(&'b mut FrameBuilder<'a>, &StandaloneInputState) -> Result<(), E>;
 
+pub trait InfallibleDrawCallback =
+    for<'a, 'b> FnMut(&'b mut FrameBuilder<'a>, &StandaloneInputState);
+
 impl StandaloneRenderer {
-    /// Run the event loop until an error is encountered, close request is received or `Esc` is pressed.
+    pub fn run_infallible(self, mut draw_callback: impl InfallibleDrawCallback + 'static) {
+        self.run(move |a, b| Ok::<(), Infallible>(draw_callback(a, b)))
+            .unwrap();
+    }
+
+    /// Run the event loop until an error is encountered, close request is received when `Esc` is pressed.
     pub fn run<E: Error>(
         self,
         mut draw_callback: impl StandaloneDrawCallback<E> + 'static,

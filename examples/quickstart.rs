@@ -1,8 +1,6 @@
-use std::convert::Infallible;
-
 use tangerine::{SpriteInstance, StandaloneRenderer};
 
-const BACKGROUND: &str = "background";
+const BACKGROUND: &str = "Some(BACKGROUND)";
 const FOREGROUND: &str = "foreground";
 
 fn main() {
@@ -21,58 +19,54 @@ fn main() {
         .add_sprite(texture_8x8)
         .finalize_and_repack();
 
-    renderer
-        .run::<Infallible>(move |frame, input| {
-            let cursor_pos = frame.renderer().window_to_world(input.cursor_pos);
+    renderer.run_infallible(move |frame, input| {
+        let cursor_pos = frame.renderer().window_to_world(input.cursor_pos);
 
-            frame
-                .draw_sprite(
-                    i8x8,
-                    BACKGROUND,
-                    SpriteInstance {
-                        color: [0x00, 0xFF, 0xFF].into(),
-                        ..Default::default()
-                    },
-                )
-                .draw_sprite(
-                    i8x8,
-                    FOREGROUND,
-                    SpriteInstance {
-                        position: [cursor_pos.x, cursor_pos.y, 0.].into(),
-                        color: [0xFF, 0xFF, 0xFF].into(),
-                        ..Default::default()
-                    },
-                )
-                .draw_sprite(
-                    i16x16,
-                    BACKGROUND,
-                    SpriteInstance {
-                        position: [0., 1., 0.].into(),
-                        color: [0xFF, 0xFF, 0x00].into(),
-                        ..Default::default()
-                    },
-                )
-                .draw_sprite(
-                    i16x16,
-                    BACKGROUND,
-                    SpriteInstance {
-                        position: [1., 0., 0.].into(),
-                        color: [0xFF, 0xFF, 0x00].into(),
-                        ..Default::default()
-                    },
-                )
-                .draw_sprite(
-                    i8x16,
-                    BACKGROUND,
-                    SpriteInstance {
-                        position: [0., 2., 0.].into(),
-                        opacity: 0.5,
-                        ..Default::default()
-                    },
-                )
-                .done();
-
-            Ok(())
-        })
-        .unwrap();
+        frame
+            .draw_sprite(
+                i8x8,
+                Some(BACKGROUND),
+                SpriteInstance {
+                    color: [0x00, 0xFF, 0xFF].into(),
+                    ..Default::default()
+                },
+            )
+            .draw_sprite(
+                i8x8,
+                Some(FOREGROUND),
+                SpriteInstance {
+                    position: [cursor_pos.x, cursor_pos.y, 0.].into(),
+                    color: [0xFF, 0xFF, 0xFF].into(),
+                    ..Default::default()
+                },
+            )
+            .draw_sprite(
+                i16x16,
+                Some(BACKGROUND),
+                SpriteInstance {
+                    position: [0., 1., 0.].into(),
+                    color: [0xFF, 0xFF, 0x00].into(),
+                    ..Default::default()
+                },
+            )
+            .draw_sprite(
+                i16x16,
+                Some(BACKGROUND),
+                SpriteInstance {
+                    position: [1., 0., 0.].into(),
+                    color: [0xFF, 0xFF, 0x00].into(),
+                    ..Default::default()
+                },
+            )
+            .draw_sprite(
+                i8x16,
+                Some(BACKGROUND),
+                SpriteInstance {
+                    position: [0., 2., 0.].into(),
+                    opacity: 0.5,
+                    ..Default::default()
+                },
+            )
+            .done();
+    });
 }

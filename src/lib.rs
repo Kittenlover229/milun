@@ -1,10 +1,10 @@
 #![allow(incomplete_features)]
 #![feature(iter_array_chunks)]
-#![feature(generators)]
+#![feature(coroutines)]
 #![feature(trait_alias)]
-#![feature(generator_trait)]
+#![feature(coroutine_trait)]
 #![feature(generic_const_exprs)]
-#![feature(iter_from_generator)]
+#![feature(iter_from_coroutine)]
 #![feature(arbitrary_self_types)]
 #![feature(c_size_t)]
 

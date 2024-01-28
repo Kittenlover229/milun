@@ -1,9 +1,9 @@
-use std::{convert::Infallible, f32::consts::PI};
+use std::f32::consts::PI;
 
 use mint::Vector2;
 use tangerine::{
-    Camera, FrameBuilder, SpriteIndex, SpriteInstance, SpriteTransform, StandaloneDrawCallback,
-    StandaloneInputState, StandaloneRenderer,
+    Camera, FrameBuilder, InfallibleDrawCallback, SpriteIndex, StandaloneInputState,
+    StandaloneRenderer,
 };
 use winit::event::{ScanCode, VirtualKeyCode};
 
@@ -99,7 +99,7 @@ pub fn make_draw_callback(
     spaceship_sprite: SpriteIndex,
     cursor_sprite: SpriteIndex,
     projectile_sprite: SpriteIndex,
-) -> impl StandaloneDrawCallback {
+) -> impl InfallibleDrawCallback {
     let mut asteroids: Vec<Asteroid> = vec![
         Asteroid {
             position: [0.; 2].into(),
@@ -183,15 +183,12 @@ pub fn make_draw_callback(
             position.x += velocity.x * dt * PROJECTILE_SPEED;
             position.y += velocity.y * dt * PROJECTILE_SPEED;
 
-            frame.draw_sprite(
-                projectile_sprite,
-                FOREGROUND,
-                SpriteInstance {
-                    position: [position.x, position.y, 0.].into(),
-                    transform: SpriteTransform::size(0.5),
-                    ..Default::default()
-                },
-            );
+            frame
+                .sprite(projectile_sprite)
+                .layer(FOREGROUND)
+                .pos([position.x, position.y, 0.])
+                .scale(0.5)
+                .draw();
 
             for (
                 i,
@@ -251,44 +248,31 @@ pub fn make_draw_callback(
 
             *rotor += dt * size;
 
-            frame.draw_sprite(
-                asteroid_sprite,
-                FOREGROUND,
-                SpriteInstance {
-                    position: [position.x, position.y, 0.].into(),
-                    transform: SpriteTransform {
-                        scale: [*asteroid_size; 2].into(),
-                        rotation_deg: ROCK_SPINOR * *rotor / 180. * PI,
-                    },
-                    ..Default::default()
-                },
-            );
+            frame
+                .sprite(asteroid_sprite)
+                .layer(FOREGROUND)
+                .pos([position.x, position.y, 0.])
+                .scale(*asteroid_size)
+                .scale(ROCK_SPINOR * *rotor / 180. * PI)
+                .draw();
         }
 
-        frame.draw_sprite(
-            cursor_sprite,
-            FOREGROUND,
-            SpriteInstance {
-                position: [cursor_pos.x, cursor_pos.y, 0.].into(),
-                opacity: 0.333,
-                transform: SpriteTransform::size(0.5),
-                ..Default::default()
-            },
-        );
+        frame
+            .sprite(cursor_sprite)
+            .layer(FOREGROUND)
+            .pos([cursor_pos.x, cursor_pos.y, 0.])
+            .opacity(0.333)
+            .scale(0.5)
+            .draw();
 
         player.position = rect_wrap(player.position, size, size * aspect_ratio, 1.);
 
-        frame.draw_sprite(
-            spaceship_sprite,
-            FOREGROUND,
-            SpriteInstance {
-                position: [player.position.x, player.position.y, 0.].into(),
-                transform: SpriteTransform::rotated_rad(angle + PI),
-                ..Default::default()
-            },
-        );
-
-        Ok(())
+        frame
+            .sprite(spaceship_sprite)
+            .layer(FOREGROUND)
+            .pos([player.position.x, player.position.y, 0.])
+            .rotate(angle + PI)
+            .draw();
     }
 }
 
@@ -316,12 +300,10 @@ fn main() {
 
     renderer.mutate_camera(|camera| camera.size = 8.);
 
-    renderer
-        .run::<Infallible>(make_draw_callback(
-            asteroid_sprite,
-            spaceship_sprite,
-            cursor_sprite,
-            projectile_sprite,
-        ))
-        .unwrap();
+    renderer.run_infallible(make_draw_callback(
+        asteroid_sprite,
+        spaceship_sprite,
+        cursor_sprite,
+        projectile_sprite,
+    ));
 }

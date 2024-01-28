@@ -1,4 +1,4 @@
-use std::cell::OnceCell;
+use std::{cell::OnceCell, f32::consts::PI};
 
 use chrono::{Duration, NaiveDateTime, Utc};
 use cint::EncodedSrgb;
@@ -8,7 +8,7 @@ use crate::egui::EguiIntegration;
 #[cfg(feature = "egui")]
 use egui::Context;
 
-use mint::Vector2;
+use mint::{Vector2, Vector3};
 use wgpu::{util::DeviceExt, Buffer, BufferDescriptor, BufferUsages};
 use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window};
 
@@ -436,10 +436,13 @@ impl Renderer {
         }
     }
 
-    pub(crate) fn resolve_layer_ord(&mut self, layer: &LayerIdentifier) -> i32 {
-        *match layer {
-            LayerIdentifier::Ordinal(c) => c,
-            LayerIdentifier::Named(name) => self.named_layers.get(name.as_ref()).unwrap_or(&0),
+    pub(crate) fn resolve_layer_ord(&mut self, layer: Option<&LayerIdentifier>) -> i32 {
+        match layer {
+            None => 0,
+            Some(LayerIdentifier::Ordinal(c)) => *c,
+            Some(LayerIdentifier::Named(name)) => {
+                *self.named_layers.get(name.as_ref()).unwrap_or(&0)
+            }
         }
     }
 }
@@ -466,11 +469,65 @@ impl Renderer {
     }
 }
 
+#[must_use]
+pub struct DrawSprite<'builder, 'renderer> {
+    renderer: &'builder mut FrameBuilder<'renderer>,
+    sprite_idx: SpriteIndex,
+    layer: Option<LayerIdentifier>,
+    sprite_instance: SpriteInstance,
+}
+
+impl<'builder, 'renderer> DrawSprite<'builder, 'renderer> {
+    pub fn layer(self, layer: impl Into<LayerIdentifier>) -> Self {
+        Self {
+            layer: Some(layer.into()),
+            ..self
+        }
+    }
+
+    pub fn pos(mut self, pos: impl Into<Vector3<f32>>) -> Self {
+        self.sprite_instance.position = pos.into();
+        self
+    }
+
+    pub fn opacity(mut self, opacity: impl Into<f32>) -> Self {
+        self.sprite_instance.opacity = opacity.into();
+        self
+    }
+
+    pub fn color(mut self, color: impl Into<EncodedSrgb<u8>>) -> Self {
+        self.sprite_instance.color = color.into();
+        self
+    }
+
+    pub fn stretch(mut self, scale: impl Into<Vector2<f32>>) -> Self {
+        self.sprite_instance.transform.scale = scale.into();
+        self
+    }
+
+    pub fn scale(mut self, size: impl Into<f32>) -> Self {
+        let size: f32 = size.into();
+        self.sprite_instance.transform.scale = [size, size].into();
+        self
+    }
+
+    pub fn rotate(mut self, deg: f32) -> Self {
+        self.sprite_instance.transform.rotation_deg = deg * 180. / PI;
+        self
+    }
+
+    pub fn draw(self) -> &'builder mut FrameBuilder<'renderer> {
+        self.renderer
+            .draw_sprite(self.sprite_idx, self.layer, self.sprite_instance);
+        self.renderer
+    }
+}
+
 /// Used for adding draw data to a frame of a [`Renderer`].
 #[must_use]
 pub struct FrameBuilder<'renderer> {
     renderer: &'renderer mut Renderer,
-    draw_sprites: Vec<(SpriteIndex, (LayerIdentifier, SpriteInstance))>,
+    draw_sprites: Vec<(SpriteIndex, (Option<LayerIdentifier>, SpriteInstance))>,
 }
 
 impl<'renderer> From<&'renderer mut Renderer> for FrameBuilder<'renderer> {
@@ -484,7 +541,16 @@ impl<'renderer> From<&'renderer mut Renderer> for FrameBuilder<'renderer> {
     }
 }
 
-impl FrameBuilder<'_> {
+impl<'renderer> FrameBuilder<'renderer> {
+    pub fn sprite(&mut self, sprite_idx: SpriteIndex) -> DrawSprite<'_, 'renderer> {
+        DrawSprite {
+            renderer: self,
+            layer: None,
+            sprite_idx,
+            sprite_instance: SpriteInstance::default(),
+        }
+    }
+
     /// Draws the sprite at index `sprite_index` in the Renderer's sprite list.
     ///
     /// The sprite is displayed at `position`, tinted with colour `color` and
@@ -493,14 +559,15 @@ impl FrameBuilder<'_> {
     /// All the sprites are considered non-premultiplied by default.
     /// If the sprite you are drawing is premultiplied, specify that option in
     /// the [`AtlasBuilder`] using the [`SpriteLoadOptions`].
+    #[deprecated = "Use `sprite` instead"]
     pub fn draw_sprite(
         &mut self,
         sprite_idx: SpriteIndex,
-        layer_id: impl Into<LayerIdentifier>,
+        layer_id: Option<impl Into<LayerIdentifier>>,
         instance: impl Into<SpriteInstance>,
     ) -> &mut Self {
         self.draw_sprites
-            .push((sprite_idx, (layer_id.into(), instance.into())));
+            .push((sprite_idx, (layer_id.map(|x| x.into()), instance.into())));
         self
     }
 
@@ -536,8 +603,8 @@ impl FrameBuilder<'_> {
 
         self.draw_sprites.sort_by(
             |(sprite_idx_lhs, (layer_lhs, _)), (sprite_idx_rhs, (layer_rhs, _))| {
-                let layer_lhs = self.renderer.resolve_layer_ord(layer_lhs);
-                let layer_rhs = self.renderer.resolve_layer_ord(layer_rhs);
+                let layer_lhs = self.renderer.resolve_layer_ord(layer_lhs.as_ref());
+                let layer_rhs = self.renderer.resolve_layer_ord(layer_rhs.as_ref());
 
                 match layer_lhs.cmp(&layer_rhs) {
                     std::cmp::Ordering::Equal => sprite_idx_lhs.cmp(sprite_idx_rhs),
