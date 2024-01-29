@@ -66,7 +66,6 @@ fn main() {
                     opacity: 0.5,
                     ..Default::default()
                 },
-            )
-            .done();
+            );
     });
 }

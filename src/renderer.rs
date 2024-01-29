@@ -718,8 +718,6 @@ impl<'renderer> FrameBuilder<'renderer> {
         Ok(())
     }
 
-    pub fn done(&mut self) {}
-
     pub fn renderer(&mut self) -> &mut Renderer {
         self.renderer
     }
