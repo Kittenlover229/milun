@@ -184,11 +184,11 @@ pub fn make_draw_callback(
             position.y += velocity.y * dt * PROJECTILE_SPEED;
 
             frame
-                .sprite(projectile_sprite)
+                .draw_sprite(projectile_sprite)
                 .layer(FOREGROUND)
                 .pos([position.x, position.y, 0.])
                 .scale(0.5)
-                .draw();
+                .done();
 
             for (
                 i,
@@ -249,30 +249,30 @@ pub fn make_draw_callback(
             *rotor += dt * size;
 
             frame
-                .sprite(asteroid_sprite)
+                .draw_sprite(asteroid_sprite)
                 .layer(FOREGROUND)
                 .pos([position.x, position.y, 0.])
                 .scale(*asteroid_size)
                 .rotate(ROCK_SPINOR * *rotor)
-                .draw();
+                .done();
         }
 
         frame
-            .sprite(cursor_sprite)
+            .draw_sprite(cursor_sprite)
             .layer(FOREGROUND)
             .pos([cursor_pos.x, cursor_pos.y, 0.])
             .opacity(0.333)
             .scale(0.5)
-            .draw();
+            .done();
 
         player.position = rect_wrap(player.position, size, size * aspect_ratio, 1.);
 
         frame
-            .sprite(spaceship_sprite)
+            .draw_sprite(spaceship_sprite)
             .layer(FOREGROUND)
             .pos([player.position.x, player.position.y, 0.])
             .rotate(angle + PI)
-            .draw();
+            .done();
     }
 }
 

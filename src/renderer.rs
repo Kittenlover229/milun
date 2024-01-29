@@ -516,9 +516,9 @@ impl<'builder, 'renderer> DrawSprite<'builder, 'renderer> {
         self
     }
 
-    pub fn draw(self) -> &'builder mut FrameBuilder<'renderer> {
+    pub fn done(self) -> &'builder mut FrameBuilder<'renderer> {
         self.renderer
-            .draw_sprite(self.sprite_idx, self.layer, self.sprite_instance);
+            .submit_sprite(self.sprite_idx, self.layer, self.sprite_instance);
         self.renderer
     }
 }
@@ -542,7 +542,7 @@ impl<'renderer> From<&'renderer mut Renderer> for FrameBuilder<'renderer> {
 }
 
 impl<'renderer> FrameBuilder<'renderer> {
-    pub fn sprite(&mut self, sprite_idx: SpriteIndex) -> DrawSprite<'_, 'renderer> {
+    pub fn draw_sprite(&mut self, sprite_idx: SpriteIndex) -> DrawSprite<'_, 'renderer> {
         DrawSprite {
             renderer: self,
             layer: None,
@@ -559,8 +559,7 @@ impl<'renderer> FrameBuilder<'renderer> {
     /// All the sprites are considered non-premultiplied by default.
     /// If the sprite you are drawing is premultiplied, specify that option in
     /// the [`AtlasBuilder`] using the [`SpriteLoadOptions`].
-    #[deprecated = "Use `sprite` instead"]
-    pub fn draw_sprite(
+    pub(crate) fn submit_sprite(
         &mut self,
         sprite_idx: SpriteIndex,
         layer_id: Option<impl Into<LayerIdentifier>>,
@@ -606,7 +605,9 @@ impl<'renderer> FrameBuilder<'renderer> {
                 let layer_lhs = self.renderer.resolve_layer_ord(layer_lhs.as_ref());
                 let layer_rhs = self.renderer.resolve_layer_ord(layer_rhs.as_ref());
 
-                layer_lhs.cmp(&layer_rhs).then(sprite_idx_lhs.cmp(sprite_idx_rhs))
+                layer_lhs
+                    .cmp(&layer_rhs)
+                    .then(sprite_idx_lhs.cmp(sprite_idx_rhs))
             },
         );
 
