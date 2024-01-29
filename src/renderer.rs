@@ -1,4 +1,4 @@
-use std::{cell::OnceCell, f32::consts::PI};
+use std::cell::OnceCell;
 
 use chrono::{Duration, NaiveDateTime, Utc};
 use cint::EncodedSrgb;
@@ -511,8 +511,8 @@ impl<'builder, 'renderer> DrawSprite<'builder, 'renderer> {
         self
     }
 
-    pub fn rotate(mut self, deg: f32) -> Self {
-        self.sprite_instance.transform.rotation_deg = deg * 180. / PI;
+    pub fn rotate(mut self, rad: f32) -> Self {
+        self.sprite_instance.transform.rotation_rad = rad;
         self
     }
 

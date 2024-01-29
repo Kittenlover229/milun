@@ -13,7 +13,7 @@ class Renderer:
         position: Tuple[float, float],
         *,
         layer: Union[str, int] = 0,
-        angle_in_degrees: 0.0,
+        angle: 0.0,
         color: Tuple[int, int, int] | Tuple[float, float, float] = (1.0, 1.0, 1.0),
         scale: float | Tuple[float, float] = 1.0,
         opacity: float = 1.0,

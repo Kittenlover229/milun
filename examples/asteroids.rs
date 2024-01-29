@@ -1,4 +1,4 @@
-use std::f32::consts::PI;
+use std::f32::consts::{PI, TAU};
 
 use mint::Vector2;
 use tangerine::{
@@ -11,7 +11,7 @@ const BACKGROUND: &str = "background";
 const FOREGROUND: &str = "foreground";
 const PROJECTILE_SPEED: f32 = 2.;
 
-pub const ROCK_SPINOR: f32 = 18.;
+pub const ROCK_SPINOR: f32 = 0.1 / TAU;
 
 struct Asteroid {
     pub position: Vector2<f32>,
@@ -253,7 +253,7 @@ pub fn make_draw_callback(
                 .layer(FOREGROUND)
                 .pos([position.x, position.y, 0.])
                 .scale(*asteroid_size)
-                .scale(ROCK_SPINOR * *rotor / 180. * PI)
+                .rotate(ROCK_SPINOR * *rotor)
                 .draw();
         }
 

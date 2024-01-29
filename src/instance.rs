@@ -7,8 +7,8 @@ use mint::{Vector2, Vector3};
 pub struct SpriteTransform {
     /// How much the sprite should be stretched along it's own X and Y axes.
     pub scale: Vector2<f32>,
-    /// Clockwise rotation of the sprite in the plane in degrees.
-    pub rotation_deg: f32,
+    /// Clockwise rotation of the sprite in the plane in rad.
+    pub rotation_rad: f32,
 }
 
 impl SpriteTransform {
@@ -25,14 +25,14 @@ impl SpriteTransform {
 
     pub fn rotated_deg(rotation_deg: f32) -> Self {
         Self {
-            rotation_deg,
+            rotation_rad: rotation_deg.to_radians(),
             ..Default::default()
         }
     }
 
     pub fn rotated_rad(rotation_rad: f32) -> Self {
         Self {
-            rotation_deg: rotation_rad.to_degrees(),
+            rotation_rad,
             ..Default::default()
         }
     }
@@ -42,7 +42,7 @@ impl Default for SpriteTransform {
     fn default() -> Self {
         Self {
             scale: [1.; 2].into(),
-            rotation_deg: 0.,
+            rotation_rad: 0.,
         }
     }
 }
@@ -97,7 +97,7 @@ impl SpriteInstance {
 
         RawSpriteInstance {
             position: self.position.into(),
-            rotation_rad: f32::to_radians(self.transform.rotation_deg),
+            rotation_rad: self.transform.rotation_rad,
             scale: self.transform.scale.into(),
             color: [r, g, b, self.opacity].map(|component| component.clamp(0., 1.)),
         }
