@@ -606,10 +606,7 @@ impl<'renderer> FrameBuilder<'renderer> {
                 let layer_lhs = self.renderer.resolve_layer_ord(layer_lhs.as_ref());
                 let layer_rhs = self.renderer.resolve_layer_ord(layer_rhs.as_ref());
 
-                match layer_lhs.cmp(&layer_rhs) {
-                    std::cmp::Ordering::Equal => sprite_idx_lhs.cmp(sprite_idx_rhs),
-                    x => x,
-                }
+                layer_lhs.cmp(&layer_rhs).then(sprite_idx_lhs.cmp(sprite_idx_rhs))
             },
         );
 

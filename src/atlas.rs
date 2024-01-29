@@ -19,11 +19,10 @@ impl<'me, const N: usize> AtlasBuilder<'me, N> {
     #[must_use]
     pub fn finalize_and_repack(mut self) -> [SpriteIndex; N] {
         self.rgba.sort_by(|lhs, rhs| {
-            match lhs.width().cmp(&rhs.width()) {
-                std::cmp::Ordering::Equal => lhs.height().cmp(&rhs.height()),
-                x => x,
-            }
-            .reverse()
+            lhs.width()
+                .cmp(&rhs.width())
+                .then(lhs.height().cmp(&rhs.height()))
+                .reverse()
         });
 
         let mut root = Node {

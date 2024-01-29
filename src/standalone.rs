@@ -77,8 +77,11 @@ pub trait InfallibleDrawCallback =
 
 impl StandaloneRenderer {
     pub fn run_infallible(self, mut draw_callback: impl InfallibleDrawCallback + 'static) {
-        self.run(move |a, b| Ok::<(), Infallible>(draw_callback(a, b)))
-            .unwrap();
+        self.run(move |a, b| {
+            draw_callback(a, b);
+            Ok::<(), Infallible>(())
+        })
+        .unwrap();
     }
 
     /// Run the event loop until an error is encountered, close request is received when `Esc` is pressed.
@@ -154,14 +157,11 @@ impl StandaloneRenderer {
 
                         let mut frame_builder = renderer.begin_frame();
 
-                        match draw_callback(&mut frame_builder, &gathered_input) {
-                            Err(err) => {
-                                *error_return = err.into();
-                                *control_flow = ControlFlow::Exit;
-                                return;
-                            }
-                            _ => {}
-                        };
+                        if let Err(err) = draw_callback(&mut frame_builder, &gathered_input) {
+                            *error_return = err.into();
+                            *control_flow = ControlFlow::Exit;
+                            return;
+                        }
 
                         gathered_input.pressed_keys.clear();
                         gathered_input.released_keys.clear();

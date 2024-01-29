@@ -24,6 +24,7 @@ mod vertex;
 
 pub use atlas::*;
 pub use camera::*;
+#[allow(unused_imports)]
 pub use ffi::*;
 pub use instance::*;
 pub use layer::*;
