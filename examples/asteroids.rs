@@ -175,10 +175,14 @@ pub fn make_draw_callback(
         player.position.y += player.velocity.y * dt;
 
         let mut asteroids_to_remove = vec![];
+        let mut projectiles_to_remove = vec![];
 
-        for Projectile {
-            position, velocity, ..
-        } in projectiles.iter_mut()
+        for (
+            i,
+            Projectile {
+                position, velocity, ..
+            },
+        ) in projectiles.iter_mut().enumerate()
         {
             position.x += velocity.x * dt * PROJECTILE_SPEED;
             position.y += velocity.y * dt * PROJECTILE_SPEED;
@@ -191,7 +195,7 @@ pub fn make_draw_callback(
                 .done();
 
             for (
-                i,
+                j,
                 Asteroid {
                     position: asteroid_pos,
                     size,
@@ -204,9 +208,17 @@ pub fn make_draw_callback(
 
                 let distance = (dx * dx + dy * dy).sqrt();
                 if distance <= *size {
-                    asteroids_to_remove.push(i);
+                    asteroids_to_remove.push(j);
+                    projectiles_to_remove.push(i);
+                    continue;
                 }
             }
+        }
+
+        let mut removed = 0;
+        for idx in projectiles_to_remove {
+            projectiles.remove(idx - removed);
+            removed += 1;
         }
 
         for (removed_count, i) in asteroids_to_remove.into_iter().enumerate() {
