@@ -127,7 +127,7 @@ pub fn make_draw_callback(
     move |frame: &mut FrameBuilder, input: &StandaloneInputState| {
         let Camera {
             aspect_ratio, size, ..
-        } = *frame.renderer().camera();
+        } = frame.viewport().camera;
 
         let dt = input.delta_time_secs;
 
@@ -137,7 +137,7 @@ pub fn make_draw_callback(
             input.released_keys.iter(),
         );
 
-        let cursor_pos: Vector2<f32> = frame.renderer().window_to_world(input.cursor_pos);
+        let cursor_pos: Vector2<f32> = frame.viewport().window_to_world(input.cursor_pos);
         let angle = -(player.position.x - cursor_pos.x).atan2(player.position.y - cursor_pos.y);
 
         if input

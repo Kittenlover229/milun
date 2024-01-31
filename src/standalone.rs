@@ -1,4 +1,5 @@
 use std::{
+    alloc::{Allocator, Global},
     cell::OnceCell,
     convert::Infallible,
     error::Error,
@@ -15,7 +16,7 @@ use winit::{
     window::WindowBuilder,
 };
 
-use crate::{FrameBuilder, Renderer};
+use crate::{frame::FrameBuilder, Renderer};
 
 /// Standalone renderer that instead of taking ownership of an existing window creates its own.
 pub struct StandaloneRenderer {
@@ -23,8 +24,6 @@ pub struct StandaloneRenderer {
     renderer: Renderer,
     /// Event loop in which the `.run(..)` function is ran.
     event_loop: EventLoop<()>,
-    /// Map of the active states of all currently pressed keys
-    keys_pressed: HashSet<VirtualKeyCode>,
 }
 
 /// All the input gathered by the [`StandaloneRenderer`] since last frame.
@@ -64,16 +63,14 @@ impl StandaloneRenderer {
         Self {
             renderer: Renderer::from(window),
             event_loop,
-            keys_pressed: Default::default(),
         }
     }
 }
+pub trait StandaloneDrawCallback<E: Error = Infallible, A: Allocator = Global> =
+    for<'a> FnMut(&'a mut FrameBuilder<A>, &StandaloneInputState) -> Result<(), E>;
 
-pub trait StandaloneDrawCallback<E: Error = Infallible> =
-    for<'a, 'b> FnMut(&'b mut FrameBuilder<'a>, &StandaloneInputState) -> Result<(), E>;
-
-pub trait InfallibleDrawCallback =
-    for<'a, 'b> FnMut(&'b mut FrameBuilder<'a>, &StandaloneInputState);
+pub trait InfallibleDrawCallback<A: Allocator = Global> =
+    for<'a> FnMut(&'a mut FrameBuilder<A>, &StandaloneInputState);
 
 impl StandaloneRenderer {
     pub fn run_infallible(self, mut draw_callback: impl InfallibleDrawCallback + 'static) {
@@ -92,7 +89,6 @@ impl StandaloneRenderer {
         let StandaloneRenderer {
             mut event_loop,
             mut renderer,
-            mut keys_pressed,
             ..
         } = self;
 
@@ -107,8 +103,11 @@ impl StandaloneRenderer {
 
         event_loop.run_return({
             let error_return = &mut error_return;
+            let mut keys_pressed: HashSet<VirtualKeyCode> = Default::default();
+
             move |event, _, control_flow| {
                 let window = renderer.window();
+
                 match event {
                     Event::WindowEvent {
                         ref event,
@@ -155,7 +154,8 @@ impl StandaloneRenderer {
                             as f32
                             * (10e-9);
 
-                        let mut frame_builder = renderer.begin_frame();
+                        let mut frame_builder =
+                            FrameBuilder::new_global(renderer.viewport());
 
                         if let Err(err) = draw_callback(&mut frame_builder, &gathered_input) {
                             *error_return = err.into();
@@ -166,7 +166,7 @@ impl StandaloneRenderer {
                         gathered_input.pressed_keys.clear();
                         gathered_input.released_keys.clear();
 
-                        match frame_builder.end_frame() {
+                        match renderer.draw_frame(frame_builder.finalize()) {
                             Ok(_) => {}
                             Err(wgpu::SurfaceError::Lost) => renderer.resize(renderer.size()),
                             Err(wgpu::SurfaceError::OutOfMemory) => {

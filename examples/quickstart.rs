@@ -20,7 +20,7 @@ fn main() {
         .finalize_and_repack();
 
     renderer.run_infallible(move |frame, input| {
-        let cursor_pos = frame.renderer().window_to_world(input.cursor_pos);
+        let cursor_pos = frame.viewport().window_to_world(input.cursor_pos);
 
         frame
             .draw_sprite(i8x8)
